@@ -3,9 +3,12 @@
 		availabilityRanges: { start: string; end: string }[];
 		currentTime: Date | null;
 		onSeek: (time: Date) => void;
+		selectionStart?: Date | null;
+		selectionEnd?: Date | null;
+		onSelectionChange?: (start: Date | null, end: Date | null) => void;
 	}
 
-	let { availabilityRanges, currentTime, onSeek }: Props = $props();
+	let { availabilityRanges, currentTime, onSeek, selectionStart = null, selectionEnd = null, onSelectionChange }: Props = $props();
 
 	let containerEl = $state<HTMLDivElement | null>(null);
 	let containerWidth = $state(800);
@@ -133,8 +136,33 @@
 			if (containerEl) {
 				const rect = containerEl.getBoundingClientRect();
 				const localX = e.clientX - rect.left;
-				onSeek(xToTime(localX));
+				const clickedTime = xToTime(localX);
+
+				if (e.shiftKey) {
+					if (!selectionStart) {
+						onSelectionChange?.(clickedTime, null);
+					} else if (!selectionEnd) {
+						let s = selectionStart;
+						let end = clickedTime;
+						if (end < s) [s, end] = [end, s];
+						onSelectionChange?.(s, end);
+					} else {
+						onSelectionChange?.(null, null);
+					}
+					return;
+				}
+
+				if (selectionStart || selectionEnd) {
+					onSelectionChange?.(null, null);
+				}
+				onSeek(clickedTime);
 			}
+		}
+	}
+
+	function handleKeyDown(e: KeyboardEvent) {
+		if (e.key === 'Escape' && (selectionStart || selectionEnd)) {
+			onSelectionChange?.(null, null);
 		}
 	}
 
@@ -164,6 +192,7 @@
 		onpointermove={handlePointerMove}
 		onpointerup={handlePointerUp}
 		onpointerleave={() => { hoverX = null; }}
+		onkeydown={handleKeyDown}
 		role="slider"
 		aria-label="Recording timeline"
 		tabindex="0"
@@ -173,9 +202,38 @@
 				style="left: {rect.x}px; width: {rect.width}px;"></div>
 		{/each}
 
+		{#if selectionStart && selectionEnd}
+			<div class="absolute top-0 h-full bg-blue-500/30 pointer-events-none"
+				style="left: {Math.max(0, timeToX(selectionStart))}px; width: {Math.max(1, timeToX(selectionEnd) - timeToX(selectionStart))}px;">
+			</div>
+			<div class="absolute top-0 h-full w-0.5 bg-white cursor-col-resize"
+				style="left: {timeToX(selectionStart)}px;"
+				aria-label="Export start marker">
+			</div>
+			<div class="absolute top-0 h-full w-0.5 bg-white cursor-col-resize"
+				style="left: {timeToX(selectionEnd)}px;"
+				aria-label="Export end marker">
+			</div>
+		{:else if selectionStart}
+			<div class="absolute top-0 h-full w-0.5 bg-white pointer-events-none"
+				style="left: {timeToX(selectionStart)}px;">
+			</div>
+		{/if}
+
 		{#if playheadX !== null}
 			<div class="absolute top-0 h-full w-0.5 bg-white pointer-events-none"
 				style="left: {playheadX}px;"></div>
+		{/if}
+
+		{#if selectionStart && selectionEnd}
+			<div class="absolute -top-8 rounded bg-gray-900 px-2 py-1 text-xs text-white border border-gray-700 shadow-lg pointer-events-none whitespace-nowrap"
+				style="left: {timeToX(selectionStart)}px; transform: translateX(-50%);">
+				{formatTooltipTime(selectionStart)}
+			</div>
+			<div class="absolute -top-8 rounded bg-gray-900 px-2 py-1 text-xs text-white border border-gray-700 shadow-lg pointer-events-none whitespace-nowrap"
+				style="left: {timeToX(selectionEnd)}px; transform: translateX(-50%);">
+				{formatTooltipTime(selectionEnd)}
+			</div>
 		{/if}
 
 		{#if hoverX !== null && !isDragging}
