@@ -48,7 +48,13 @@ Plans:
   2. Recording automatically resumes after stream disconnect without user intervention
   3. User can see recording status (active / stopped / error) for each profile in the UI
   4. Recording processes survive application restart and resume for enabled profiles
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — Core recording engine service (RecordingManager, FFmpeg lifecycle, segment scanner)
+- [ ] 02-02-PLAN.md — Backend integration and recording status API
+- [ ] 02-03-PLAN.md — Frontend recording status indicators on stream cards
+
 **UI hint**: yes
 
 ### Phase 3: Storage & Retention
