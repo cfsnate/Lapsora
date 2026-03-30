@@ -261,6 +261,26 @@ def remove_capture_gap_job() -> None:
         logger.debug("Capture gap check job not found, nothing to remove")
 
 
+def add_segment_scanner_job() -> None:
+    """Add periodic recording segment scanner job (every 30 seconds)."""
+    from app.services.recording import scan_segments
+
+    scheduler.add_job(
+        scan_segments, "interval", seconds=30,
+        id="segment_scanner", replace_existing=True,
+    )
+    logger.info("Segment scanner job scheduled every 30s")
+
+
+def remove_segment_scanner_job() -> None:
+    """Remove the segment scanner job."""
+    try:
+        scheduler.remove_job("segment_scanner")
+        logger.info("Removed segment scanner job")
+    except Exception:
+        logger.debug("Segment scanner job not found, nothing to remove")
+
+
 def add_health_check_job(interval_seconds: int = 300) -> None:
     """Add periodic stream health check job."""
     from app.services.health import check_all_streams

@@ -79,6 +79,23 @@ def update_profile(profile_id: int, body: ProfileUpdate, db: Session = Depends(g
         else:
             scheduler.remove_capture_job(profile.id)
 
+    recording_fields = (
+        "recording_enabled", "recording_mode", "recording_start_time",
+        "recording_end_time", "recording_sun_events",
+        "recording_sun_offset_minutes", "recording_days",
+        "segment_duration_seconds",
+    )
+    if any(k in update_data for k in recording_fields):
+        import asyncio
+
+        from app.services.recording import recording_manager
+
+        loop = asyncio.get_event_loop()
+        if profile.recording_enabled:
+            asyncio.run_coroutine_threadsafe(recording_manager.restart(profile.id), loop)
+        else:
+            asyncio.run_coroutine_threadsafe(recording_manager.stop(profile.id), loop)
+
     return profile
 
 
@@ -89,6 +106,13 @@ def delete_profile(profile_id: int, db: Session = Depends(get_db)):
         raise HTTPException(404, "Profile not found")
 
     scheduler.remove_capture_job(profile.id)
+
+    import asyncio
+
+    from app.services.recording import recording_manager
+
+    loop = asyncio.get_event_loop()
+    asyncio.run_coroutine_threadsafe(recording_manager.stop(profile.id), loop)
 
     # Remove capture files
     capture_dir = os.path.join(

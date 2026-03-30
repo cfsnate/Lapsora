@@ -25,6 +25,7 @@ async def lifespan(app: FastAPI):
     data_dir.mkdir(parents=True, exist_ok=True)
     (data_dir / "captures").mkdir(exist_ok=True)
     (data_dir / "timelapses").mkdir(exist_ok=True)
+    (data_dir / "recordings").mkdir(exist_ok=True)
 
     # Run database migrations
     run_migrations(engine)
@@ -58,12 +59,18 @@ async def lifespan(app: FastAPI):
     if gap_enabled:
         add_capture_gap_job()
 
+    from app.services.scheduler import add_segment_scanner_job
+    add_segment_scanner_job()
+
     from app.services.generation_queue import start_worker
     start_worker()
 
+    from app.services.recording import recording_manager
+    await recording_manager.restore_all()
+
     yield
 
-    # Shutdown scheduler
+    await recording_manager.shutdown()
     _scheduler.shutdown()
 
 
@@ -90,6 +97,8 @@ app.include_router(cleanup_schedules.router)
 app.include_router(notifications.router)
 app.include_router(settings_router.router)
 app.include_router(statistics.router)
+from app.routers import recording as recording_router
+app.include_router(recording_router.router)
 
 # Static file mounts
 data_dir = Path(app_settings.DATA_DIR)
