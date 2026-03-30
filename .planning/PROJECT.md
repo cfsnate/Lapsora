@@ -32,7 +32,7 @@ Users can record, review, and export video from their RTSP cameras without relyi
 - ✓ Tiered recording retention — rolling auto-cleanup window with ability to protect specific recordings — Validated in Phase 3
 - ✓ Timeline scrubber UI for navigating recorded history to any point in time — Validated in Phase 4
 - ✓ Combined live view + recording timeline on a single stream page — Validated in Phase 4
-- [ ] Clip export with selectable start/end times, format, and quality options
+- ✓ Clip export with selectable start/end times, format, and quality options — Validated in Phase 5
 - [ ] Recording event notifications (started, stopped, failed, export complete, storage warnings)
 
 ### Out of Scope
@@ -64,7 +64,7 @@ The current branch is `playback-export`, indicating this work is already scoped 
 | Per-profile recording config | Consistent with existing per-profile capture config; each camera gets independent settings | Implemented — Phase 1 |
 | Tiered retention (auto + protect) | Balances storage management with ability to preserve important footage | Implemented — Phase 3 |
 | Live view + timeline on same page | Single page for stream monitoring reduces navigation; timeline gives context | Implemented — Phase 4 |
-| Clip export mirrors timelapse generation | Reuses format/quality/queue patterns already proven in timelapse workflow | — Pending |
+| Clip export mirrors timelapse generation | Reuses format/quality/queue patterns already proven in timelapse workflow | Implemented — Phase 5 |
 
 ## Evolution
 
@@ -84,4 +84,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-30 after Phase 4 completion*
+*Last updated: 2026-03-30 after Phase 5 completion*
