@@ -82,7 +82,13 @@ Plans:
   5. Gaps where recording is missing are visually indicated on the timeline
   6. Live stream and recording timeline appear on the same page for each profile
   7. User can adjust playback speed from 0.5x to 8x
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 04-01-PLAN.md — Backend playback API: playlist generation, segment serving, availability endpoint + tests
+- [ ] 04-02-PLAN.md — Frontend unified player (single video element for live+recording), playback controls, types, and API client methods
+- [ ] 04-03-PLAN.md — Zoomable timeline with gap visualization + unified live/recording playback page
+
 **UI hint**: yes
 
 ### Phase 5: Clip Export
