@@ -72,6 +72,7 @@ class ProfileCreate(BaseModel):
     segment_duration_seconds: int = Field(default=600, ge=30, le=3600)
     recording_storage_path: str | None = None
     recording_days: str = ""
+    recording_retention_days: int | None = None
 
 
 class ProfileUpdate(BaseModel):
@@ -97,6 +98,7 @@ class ProfileUpdate(BaseModel):
     segment_duration_seconds: int | None = None
     recording_storage_path: str | None = None
     recording_days: str | None = None
+    recording_retention_days: int | None = None
 
 
 class ProfileRead(BaseModel):
@@ -127,6 +129,7 @@ class ProfileRead(BaseModel):
     segment_duration_seconds: int
     recording_storage_path: str | None
     recording_days: str
+    recording_retention_days: int | None
     source_template_id: int | None = None
     created_at: datetime
     updated_at: datetime
@@ -214,6 +217,34 @@ class RecordingSegmentRead(BaseModel):
     resolution_height: int | None
     protected: bool
     created_at: datetime
+
+
+class ProtectRequest(BaseModel):
+    start_time: datetime
+    end_time: datetime
+
+
+class ProtectResponse(BaseModel):
+    affected_count: int
+
+
+class RecordingRetentionConfig(BaseModel):
+    default_retention_days: int = Field(default=14, ge=1)
+
+
+class RecordingStorageProfile(BaseModel):
+    profile_id: int
+    segment_count: int
+    total_bytes: int
+    protected_count: int
+    oldest_recording: str | None
+    newest_recording: str | None
+
+
+class RecordingStorageStats(BaseModel):
+    total_segments: int
+    total_bytes: int
+    profiles: list[RecordingStorageProfile]
 
 
 # --- Clip Exports ---
