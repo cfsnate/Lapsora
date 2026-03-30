@@ -347,3 +347,87 @@ class RecordingManager:
 
 
 recording_manager = RecordingManager()
+
+
+async def _get_segment_duration(path: str) -> float | None:
+    """Get segment duration in seconds via ffprobe."""
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "ffprobe",
+            "-v", "quiet",
+            "-show_entries", "format=duration",
+            "-of", "csv=p=0",
+            path,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=10)
+        return float(stdout.decode().strip())
+    except Exception:
+        return None
+
+
+def _parse_segment_timestamp(filename: str) -> datetime:
+    """Extract datetime from segment filename pattern YYYYMMDD_HHMMSS.ts."""
+    name = os.path.splitext(filename)[0]
+    try:
+        return datetime.strptime(name, "%Y%m%d_%H%M%S").replace(tzinfo=UTC)
+    except ValueError:
+        return datetime.now(UTC)
+
+
+async def scan_segments() -> None:
+    """Periodic job that discovers new .ts segment files and registers them in the database."""
+    db = SessionLocal()
+    try:
+        profiles = db.query(Profile).filter(Profile.recording_enabled.is_(True)).all()
+        now = datetime.now(UTC)
+        cutoff = now - timedelta(seconds=30)
+
+        for profile in profiles:
+            output_dir = os.path.join(settings.DATA_DIR, "recordings", str(profile.id))
+            if not os.path.isdir(output_dir):
+                continue
+
+            known_paths = set(
+                r[0]
+                for r in db.query(RecordingSegment.file_path)
+                .filter(RecordingSegment.profile_id == profile.id)
+                .all()
+            )
+
+            for fname in os.listdir(output_dir):
+                if not fname.endswith(".ts"):
+                    continue
+                fpath = os.path.join(output_dir, fname)
+                rel_path = os.path.join("recordings", str(profile.id), fname)
+                if rel_path in known_paths:
+                    continue
+                stat = os.stat(fpath)
+                if stat.st_size < MIN_SEGMENT_SIZE:
+                    continue
+                mtime = datetime.fromtimestamp(stat.st_mtime, tz=UTC)
+                if mtime > cutoff:
+                    continue
+
+                duration = await _get_segment_duration(fpath)
+                start_time = _parse_segment_timestamp(fname)
+
+                segment = RecordingSegment(
+                    profile_id=profile.id,
+                    file_path=rel_path,
+                    file_size=stat.st_size,
+                    duration_seconds=duration,
+                    start_time=start_time,
+                    end_time=start_time + timedelta(seconds=duration) if duration else None,
+                )
+                db.add(segment)
+
+                recording_manager.on_segment_produced(profile.id)
+
+        db.commit()
+    except Exception:
+        logger.exception("Segment scan failed")
+        db.rollback()
+    finally:
+        db.close()
