@@ -4,7 +4,7 @@ milestone: v1.0
 milestone_name: milestone
 status: verifying
 stopped_at: Completed 05-02-PLAN.md
-last_updated: "2026-03-30T22:41:17.605Z"
+last_updated: "2026-03-30T22:43:00.216Z"
 last_activity: 2026-03-30
 progress:
   total_phases: 6
@@ -66,6 +66,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 05 P03 | 3min | 2 tasks | 4 files |
 | Phase 05 P02 | 3min | 2 tasks | 3 files |
 | Phase 05 P04 | 3min | 2 tasks | 4 files |
+| Phase 05 P02 | 3min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -106,6 +107,7 @@ Recent decisions affecting current work:
 - [Phase 05]: Export Clip button positioned after speed controls with ml-auto for right-alignment
 - [Phase 05]: Export router uses /api/exports prefix with 202 async enqueue on create
 - [Phase 05]: Download endpoint validates completed status and file existence before serving
+- [Phase 05]: Cancel endpoint uses both queue-level cancel and DB status update for consistency
 
 ### Pending Todos
 
@@ -117,6 +119,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-30T22:41:17.602Z
+Last session: 2026-03-30T22:43:00.154Z
 Stopped at: Completed 05-02-PLAN.md
 Resume file: None
