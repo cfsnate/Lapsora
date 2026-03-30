@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 05-03-PLAN.md
-last_updated: "2026-03-30T22:35:37.823Z"
+status: verifying
+stopped_at: Completed 05-02-PLAN.md
+last_updated: "2026-03-30T22:41:17.605Z"
 last_activity: 2026-03-30
 progress:
   total_phases: 6
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 14
-  completed_plans: 12
+  completed_plans: 14
   percent: 0
 ---
 
@@ -26,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 ## Current Position
 
 Phase: 05 (clip-export) — EXECUTING
-Plan: 3 of 4
-Status: Ready to execute
+Plan: 4 of 4
+Status: Phase complete — ready for verification
 Last activity: 2026-03-30
 
 Progress: [░░░░░░░░░░] 0%
@@ -64,6 +64,8 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 04 P03 | 2min | 2 tasks | 3 files |
 | Phase 05 P01 | 1min | 2 tasks | 5 files |
 | Phase 05 P03 | 3min | 2 tasks | 4 files |
+| Phase 05 P02 | 3min | 2 tasks | 3 files |
+| Phase 05 P04 | 3min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -100,6 +102,10 @@ Recent decisions affecting current work:
 - [Phase 05]: Stream copy for original quality, FFmpeg concat demuxer for multi-segment clips
 - [Phase 05]: ExportDialog mirrors GenerateDialog pattern for UI consistency
 - [Phase 05]: Shift+click two-step selection for timeline range picking (start, end, clear cycle)
+- [Phase 05]: Polling interval 5s for active exports — matches UI-SPEC recommendation
+- [Phase 05]: Export Clip button positioned after speed controls with ml-auto for right-alignment
+- [Phase 05]: Export router uses /api/exports prefix with 202 async enqueue on create
+- [Phase 05]: Download endpoint validates completed status and file existence before serving
 
 ### Pending Todos
 
@@ -111,6 +117,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-30T22:35:37.820Z
-Stopped at: Completed 05-03-PLAN.md
+Last session: 2026-03-30T22:41:17.602Z
+Stopped at: Completed 05-02-PLAN.md
 Resume file: None

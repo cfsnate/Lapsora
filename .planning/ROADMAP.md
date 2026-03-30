@@ -104,9 +104,9 @@ Plans:
 
 Plans:
 - [x] 05-01-PLAN.md — Backend data layer: migration, model/schema updates, clip export service, export queue
-- [ ] 05-02-PLAN.md — Backend API: exports router, main.py wiring, test suite
+- [x] 05-02-PLAN.md — Backend API: exports router, main.py wiring, test suite
 - [x] 05-03-PLAN.md — Frontend types, API client, timeline range selection, export dialog
-- [ ] 05-04-PLAN.md — Frontend playback page wiring, exports listing page, navigation
+- [x] 05-04-PLAN.md — Frontend playback page wiring, exports listing page, navigation
 
 **UI hint**: yes
 
