@@ -5,6 +5,7 @@
 	import UnifiedPlayer from '$lib/components/UnifiedPlayer.svelte';
 	import PlaybackControls from '$lib/components/PlaybackControls.svelte';
 	import Timeline from '$lib/components/Timeline.svelte';
+	import ExportDialog from '$lib/components/ExportDialog.svelte';
 
 	let id = $derived(Number($page.params.id));
 
@@ -22,6 +23,11 @@
 	let liveWsUrl = $state<string | null>(null);
 
 	let availabilityRanges = $state<PlaybackAvailabilityRange[]>([]);
+
+	let selectionStart = $state<Date | null>(null);
+	let selectionEnd = $state<Date | null>(null);
+	let showExportDialog = $state(false);
+	let hasSelection = $derived(selectionStart !== null && selectionEnd !== null);
 
 	let recordingProfiles = $derived(profiles.filter(p => p.recording_enabled));
 	let selectedProfile = $derived(recordingProfiles.find(p => p.id === selectedProfileId) ?? null);
@@ -99,6 +105,25 @@
 			const newEnd = new Date(time.getTime() + 30 * 60 * 1000);
 			hlsSrc = api.getPlaylistUrl(selectedProfileId, newStart.toISOString(), newEnd.toISOString());
 		}
+	}
+
+	function handleSelectionChange(start: Date | null, end: Date | null) {
+		selectionStart = start;
+		selectionEnd = end;
+	}
+
+	function handleExportClick() {
+		showExportDialog = true;
+	}
+
+	function handleExportClose() {
+		showExportDialog = false;
+	}
+
+	function handleExportSubmit(exportId: number) {
+		showExportDialog = false;
+		selectionStart = null;
+		selectionEnd = null;
 	}
 
 	function handleProfileChange(profileId: number) {
@@ -193,9 +218,11 @@
 			{playing}
 			{playbackRate}
 			isLive={mode === 'live'}
+			{hasSelection}
 			onPlayPause={handlePlayPause}
 			onSpeedChange={handleSpeedChange}
 			onGoLive={handleGoLive}
+			onExportClick={handleExportClick}
 		/>
 
 		<!-- Timeline -->
@@ -204,6 +231,20 @@
 				{availabilityRanges}
 				{currentTime}
 				onSeek={handleSeek}
+				{selectionStart}
+				{selectionEnd}
+				onSelectionChange={handleSelectionChange}
+			/>
+		{/if}
+
+		{#if selectedProfileId && selectionStart && selectionEnd}
+			<ExportDialog
+				open={showExportDialog}
+				profileId={selectedProfileId}
+				startTime={selectionStart}
+				endTime={selectionEnd}
+				onclose={handleExportClose}
+				onsubmit={handleExportSubmit}
 			/>
 		{/if}
 	</div>
