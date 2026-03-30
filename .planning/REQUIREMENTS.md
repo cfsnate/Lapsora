@@ -12,7 +12,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [x] **REC-01**: User can enable continuous 24/7 recording on a per-profile basis using FFmpeg segmented MPEG-TS output
 - [x] **REC-02**: User can configure recording settings per profile (segment duration, storage location, enable/disable)
 - [x] **REC-03**: Recording automatically recovers from stream disconnects and resumes when the stream is available
-- [ ] **REC-04**: User can see recording status indicators (active/stopped/error) for each profile in the UI
+- [x] **REC-04**: User can see recording status indicators (active/stopped/error) for each profile in the UI
 - [x] **REC-05**: User can configure recording schedules per profile (time-of-day, day-of-week windows)
 
 ### Storage & Retention
@@ -79,7 +79,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | REC-01 | Phase 2 | Complete |
 | REC-02 | Phase 1 | Complete |
 | REC-03 | Phase 2 | Complete |
-| REC-04 | Phase 2 | Pending |
+| REC-04 | Phase 2 | Complete |
 | REC-05 | Phase 1 | Complete |
 | STOR-01 | Phase 3 | Pending |
 | STOR-02 | Phase 3 | Pending |
