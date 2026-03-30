@@ -186,9 +186,17 @@
 				capture_mode: profile.capture_mode,
 				active_start_time: profile.active_start_time,
 				active_end_time: profile.active_end_time,
-				sun_offset_minutes: profile.sun_offset_minutes,
-				sun_events: profile.sun_events
-			});
+			sun_offset_minutes: profile.sun_offset_minutes,
+			sun_events: profile.sun_events,
+			recording_enabled: profile.recording_enabled,
+			recording_mode: profile.recording_mode,
+			recording_start_time: profile.recording_start_time,
+			recording_end_time: profile.recording_end_time,
+			recording_sun_offset_minutes: profile.recording_sun_offset_minutes,
+			recording_sun_events: profile.recording_sun_events,
+			recording_storage_path: profile.recording_storage_path,
+			recording_days: profile.recording_days
+		});
 			profiles = await api.getStreamProfiles(id);
 		} catch (err) {
 			alert(err instanceof Error ? err.message : 'Failed to duplicate profile');

@@ -50,6 +50,15 @@ export interface Profile {
 	active_end_time: string | null;
 	sun_offset_minutes: number;
 	sun_events: string;
+	recording_enabled: boolean;
+	recording_mode: string;
+	recording_start_time: string | null;
+	recording_end_time: string | null;
+	recording_sun_offset_minutes: number;
+	recording_sun_events: string;
+	segment_duration_seconds: number;
+	recording_storage_path: string | null;
+	recording_days: string;
 	source_template_id: number | null;
 	created_at: string;
 	updated_at: string;
@@ -106,6 +115,15 @@ export interface ProfileCreate {
 	active_end_time?: string | null;
 	sun_offset_minutes?: number;
 	sun_events?: string;
+	recording_enabled?: boolean;
+	recording_mode?: string;
+	recording_start_time?: string | null;
+	recording_end_time?: string | null;
+	recording_sun_offset_minutes?: number;
+	recording_sun_events?: string;
+	segment_duration_seconds?: number;
+	recording_storage_path?: string | null;
+	recording_days?: string;
 }
 
 export interface ProfileUpdate {
@@ -122,6 +140,15 @@ export interface ProfileUpdate {
 	active_end_time?: string | null;
 	sun_offset_minutes?: number;
 	sun_events?: string;
+	recording_enabled?: boolean;
+	recording_mode?: string;
+	recording_start_time?: string | null;
+	recording_end_time?: string | null;
+	recording_sun_offset_minutes?: number;
+	recording_sun_events?: string;
+	segment_duration_seconds?: number;
+	recording_storage_path?: string | null;
+	recording_days?: string;
 }
 
 export interface LocationConfig {
