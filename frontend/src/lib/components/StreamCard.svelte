@@ -5,9 +5,10 @@
 	interface Props {
 		stream: Stream;
 		profileCount: number;
+		recordingState?: 'recording' | 'stopped' | 'error' | 'starting' | null;
 	}
 
-	let { stream, profileCount }: Props = $props();
+	let { stream, profileCount, recordingState = null }: Props = $props();
 
 	let previewKey = $state(0);
 
@@ -56,6 +57,16 @@
 	<div class="flex items-center justify-between">
 		<div class="flex items-center gap-2">
 			<span class="h-2.5 w-2.5 rounded-full {healthDotClass}" title="{stream.health_status}"></span>
+			{#if recordingState === 'recording'}
+				<span class="relative flex h-2.5 w-2.5" title="Recording">
+					<span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"></span>
+					<span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500"></span>
+				</span>
+			{:else if recordingState === 'error' || recordingState === 'starting'}
+				<span class="h-2.5 w-2.5 rounded-full bg-amber-500" title="Recording {recordingState}"></span>
+			{:else if recordingState === 'stopped'}
+				<span class="h-2.5 w-2.5 rounded-full bg-gray-600" title="Recording stopped"></span>
+			{/if}
 			<h3 class="text-lg font-semibold text-gray-100">{stream.name}</h3>
 		</div>
 		<span

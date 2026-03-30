@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { api } from '$lib/api';
-	import type { Stream, TestResult, Go2rtcStreamInfo } from '$lib/types';
+	import type { Stream, TestResult, Go2rtcStreamInfo, RecordingStatus } from '$lib/types';
 	import StreamCard from '$lib/components/StreamCard.svelte';
 
 	let streams = $state<Stream[]>([]);
 	let profileCounts = $state<Record<number, number>>({});
+	let recordingStatuses = $state<Record<string, RecordingStatus>>({});
+	let profileToStream = $state<Record<number, number>>({});
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 
@@ -32,17 +34,28 @@
 			const data = await api.getStreams();
 			streams = data;
 			const counts: Record<number, number> = {};
+			const p2s: Record<number, number> = {};
 			await Promise.all(
 				data.map(async (s) => {
 					try {
 						const profiles = await api.getStreamProfiles(s.id);
 						counts[s.id] = profiles.length;
+						for (const p of profiles) {
+							p2s[p.id] = s.id;
+						}
 					} catch {
 						counts[s.id] = 0;
 					}
 				})
 			);
 			profileCounts = counts;
+			profileToStream = p2s;
+
+			try {
+				recordingStatuses = await api.getRecordingStatuses();
+			} catch {
+				recordingStatuses = {};
+			}
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to load';
 		} finally {
@@ -50,8 +63,49 @@
 		}
 	}
 
+	function getStreamRecordingState(streamId: number): 'recording' | 'stopped' | 'error' | 'starting' | null {
+		let hasRecording = false;
+		let hasError = false;
+		let hasStarting = false;
+		let hasStopped = false;
+		for (const [pid, sid] of Object.entries(profileToStream)) {
+			if (sid !== streamId) continue;
+			const status = recordingStatuses[pid];
+			if (!status) continue;
+			if (status.state === 'recording') hasRecording = true;
+			else if (status.state === 'error') hasError = true;
+			else if (status.state === 'starting') hasStarting = true;
+			else if (status.state === 'stopped') hasStopped = true;
+		}
+		if (hasRecording) return 'recording';
+		if (hasError) return 'error';
+		if (hasStarting) return 'starting';
+		if (hasStopped) return 'stopped';
+		return null;
+	}
+
 	$effect(() => {
 		loadStreams();
+	});
+
+	$effect(() => {
+		function handleRecordingEvent(e: Event) {
+			const detail = (e as CustomEvent).detail;
+			if (detail?.event_type === 'recording_status' && detail.profile_id != null) {
+				const pid = String(detail.profile_id);
+				recordingStatuses = {
+					...recordingStatuses,
+					[pid]: {
+						state: detail.state,
+						started_at: detail.started_at ?? null,
+						last_segment_at: recordingStatuses[pid]?.last_segment_at ?? null,
+						retry_count: recordingStatuses[pid]?.retry_count ?? 0
+					}
+				};
+			}
+		}
+		window.addEventListener('lapsora:notification', handleRecordingEvent);
+		return () => window.removeEventListener('lapsora:notification', handleRecordingEvent);
 	});
 
 	async function handleAdd(e: SubmitEvent) {
@@ -144,7 +198,7 @@
 		<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
 			{#each streams as stream}
 				<div class="relative">
-					<StreamCard {stream} profileCount={profileCounts[stream.id] ?? 0} />
+					<StreamCard {stream} profileCount={profileCounts[stream.id] ?? 0} recordingState={getStreamRecordingState(stream.id)} />
 					<div class="mt-2 flex gap-2">
 						<button
 							onclick={() => testConnection(stream.id)}
