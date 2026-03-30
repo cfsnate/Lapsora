@@ -52,7 +52,7 @@ Plans:
 
 Plans:
 - [x] 02-01-PLAN.md — Core recording engine service (RecordingManager, FFmpeg lifecycle, segment scanner)
-- [ ] 02-02-PLAN.md — Backend integration and recording status API
+- [x] 02-02-PLAN.md — Backend integration and recording status API
 - [x] 02-03-PLAN.md — Frontend recording status indicators on stream cards
 
 **UI hint**: yes
