@@ -101,6 +101,8 @@ app.include_router(settings_router.router)
 app.include_router(statistics.router)
 from app.routers import recording as recording_router
 app.include_router(recording_router.router)
+from app.routers import playback as playback_router
+app.include_router(playback_router.router)
 
 # Static file mounts
 data_dir = Path(app_settings.DATA_DIR)
