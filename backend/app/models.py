@@ -70,6 +70,15 @@ class Profile(Base):
     sun_offset_minutes: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     sun_events: Mapped[str] = mapped_column(Text, default="", server_default="")
     weather_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    recording_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    recording_mode: Mapped[str] = mapped_column(Text, default="always", server_default="always")
+    recording_start_time: Mapped[str | None] = mapped_column(Text, nullable=True)
+    recording_end_time: Mapped[str | None] = mapped_column(Text, nullable=True)
+    recording_sun_offset_minutes: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    recording_sun_events: Mapped[str] = mapped_column(Text, default="", server_default="")
+    segment_duration_seconds: Mapped[int] = mapped_column(Integer, default=600, server_default="600")
+    recording_storage_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    recording_days: Mapped[str] = mapped_column(Text, default="", server_default="")
     source_template_id: Mapped[int | None] = mapped_column(
         ForeignKey("profile_templates.id", ondelete="SET NULL"), nullable=True
     )
@@ -90,6 +99,12 @@ class Profile(Base):
         back_populates="profile", cascade="all, delete-orphan"
     )
     cleanup_schedules: Mapped[list["CleanupSchedule"]] = relationship(
+        back_populates="profile", cascade="all, delete-orphan"
+    )
+    recording_segments: Mapped[list["RecordingSegment"]] = relationship(
+        back_populates="profile", cascade="all, delete-orphan"
+    )
+    clip_exports: Mapped[list["ClipExport"]] = relationship(
         back_populates="profile", cascade="all, delete-orphan"
     )
 
@@ -168,6 +183,44 @@ class Capture(Base):
     captured_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC))
 
     profile: Mapped["Profile"] = relationship(back_populates="captures")
+
+
+class RecordingSegment(Base):
+    __tablename__ = "recording_segments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    profile_id: Mapped[int] = mapped_column(ForeignKey("profiles.id", ondelete="CASCADE"))
+    file_path: Mapped[str] = mapped_column(Text, nullable=False)
+    file_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    duration_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
+    start_time: Mapped[datetime] = mapped_column(nullable=False)
+    end_time: Mapped[datetime | None] = mapped_column(nullable=True)
+    codec: Mapped[str | None] = mapped_column(Text, nullable=True)
+    resolution_width: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    resolution_height: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    protected: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC))
+
+    profile: Mapped["Profile"] = relationship(back_populates="recording_segments")
+
+
+class ClipExport(Base):
+    __tablename__ = "clip_exports"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    profile_id: Mapped[int] = mapped_column(ForeignKey("profiles.id", ondelete="CASCADE"))
+    file_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    file_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    format: Mapped[str] = mapped_column(String, default="mp4")
+    start_time: Mapped[datetime] = mapped_column(nullable=False)
+    end_time: Mapped[datetime] = mapped_column(nullable=False)
+    duration_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
+    status: Mapped[str] = mapped_column(Text, default="pending")
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC))
+    completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
+
+    profile: Mapped["Profile"] = relationship(back_populates="clip_exports")
 
 
 class Timelapse(Base):
