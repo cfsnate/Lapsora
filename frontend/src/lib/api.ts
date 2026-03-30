@@ -1,4 +1,4 @@
-import type { Stream, StreamCreate, StreamUpdate, Profile, ProfileCreate, ProfileUpdate, ProfileTemplate, ProfileTemplateCreate, Capture, Timelapse, TimelapseGenerate, TimelapseSchedule, TimelapseScheduleCreate, TimelapseScheduleUpdate, CleanupSchedule, CleanupScheduleCreate, CleanupScheduleUpdate, TestResult, StorageStats, Notification, NotificationURL, HealthConfig, NotificationEventsConfig, LocationConfig, CaptureGapConfig, TimeFormatConfig, StatsSummary, StorageTrendPoint, CaptureActivityPoint, ProfileStoragePoint, Go2rtcConfig, Go2rtcStreamInfo, TimelapseSummary } from './types';
+import type { Stream, StreamCreate, StreamUpdate, Profile, ProfileCreate, ProfileUpdate, ProfileTemplate, ProfileTemplateCreate, Capture, Timelapse, TimelapseGenerate, TimelapseSchedule, TimelapseScheduleCreate, TimelapseScheduleUpdate, CleanupSchedule, CleanupScheduleCreate, CleanupScheduleUpdate, TestResult, StorageStats, Notification, NotificationURL, HealthConfig, NotificationEventsConfig, LocationConfig, CaptureGapConfig, TimeFormatConfig, StatsSummary, StorageTrendPoint, CaptureActivityPoint, ProfileStoragePoint, Go2rtcConfig, Go2rtcStreamInfo, TimelapseSummary, RecordingStatus } from './types';
 
 const BASE = '/api';
 
@@ -155,6 +155,10 @@ export const api = {
 		return request<ProfileStoragePoint[]>(`/statistics/profile-storage?${sp}`);
 	},
 	getTimelapseSummary: () => request<TimelapseSummary>('/statistics/timelapse-summary'),
+
+	// Recording
+	getRecordingStatuses: () => request<Record<string, RecordingStatus>>('/recording/status'),
+	getRecordingStatus: (profileId: number) => request<RecordingStatus>(`/recording/status/${profileId}`),
 
 	// SSE helper
 	getNotificationStreamUrl: () => `${BASE}/notifications/stream`,

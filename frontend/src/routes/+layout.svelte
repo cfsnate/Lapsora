@@ -50,7 +50,7 @@
 				const data = JSON.parse(e.data);
 
 				// Transient events — dispatch to page handlers but don't persist or toast
-				const transientEvents = ['timelapse_progress', 'timelapse_queued', 'timelapse_queue_updated', 'timelapse_cancelled'];
+				const transientEvents = ['timelapse_progress', 'timelapse_queued', 'timelapse_queue_updated', 'timelapse_cancelled', 'recording_status'];
 				if (transientEvents.includes(data.event_type)) {
 					window.dispatchEvent(new CustomEvent('lapsora:notification', { detail: data }));
 					return;

@@ -413,3 +413,10 @@ export interface TimelapseSummary {
 	total_duration_seconds: number;
 	by_format: TimelapseFormatBreakdown[];
 }
+
+export interface RecordingStatus {
+	state: 'recording' | 'stopped' | 'error' | 'starting';
+	started_at: string | null;
+	last_segment_at: string | null;
+	retry_count: number;
+}
