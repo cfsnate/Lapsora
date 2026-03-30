@@ -10,12 +10,13 @@ from app.database import get_db
 from app.schemas import (
     CaptureActivityPoint,
     ProfileStoragePoint,
+    RecordingStorageStats,
     StatsSummary,
     StorageTrendPoint,
     TimelapseFormatBreakdown,
     TimelapseSummary,
 )
-from app.services.retention import get_storage_stats
+from app.services.retention import get_recording_storage_stats, get_storage_stats
 
 router = APIRouter(prefix="/api/statistics", tags=["statistics"])
 
@@ -212,6 +213,12 @@ def get_profile_storage(
         ProfileStoragePoint(profile_id=r.profile_id, date=r.d, bytes=r.bytes, count=r.cnt)
         for r in rows
     ]
+
+
+@router.get("/recording-storage", response_model=RecordingStorageStats)
+def get_recording_storage():
+    """Return per-profile recording storage breakdown."""
+    return get_recording_storage_stats()
 
 
 @router.get("/timelapse-summary", response_model=TimelapseSummary)

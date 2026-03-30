@@ -18,6 +18,7 @@ from app.schemas import (
     NotificationURLCreate,
     NotificationURLRead,
     NotificationURLUpdate,
+    RecordingRetentionConfig,
     TimeFormatConfig,
 )
 
@@ -243,5 +244,26 @@ def update_time_format_config(data: TimeFormatConfig, db: Session = Depends(get_
         row.value = value
     else:
         db.add(Setting(key="time_format_use_24h", value=value))
+    db.commit()
+    return data
+
+
+# --- Recording Retention Config ---
+
+
+@router.get("/recording-retention", response_model=RecordingRetentionConfig)
+def get_recording_retention_config(db: Session = Depends(get_db)):
+    row = db.query(Setting).filter(Setting.key == "default_recording_retention_days").first()
+    days = int(row.value) if row else 14
+    return RecordingRetentionConfig(default_retention_days=days)
+
+
+@router.put("/recording-retention", response_model=RecordingRetentionConfig)
+def update_recording_retention_config(data: RecordingRetentionConfig, db: Session = Depends(get_db)):
+    row = db.query(Setting).filter(Setting.key == "default_recording_retention_days").first()
+    if row:
+        row.value = str(data.default_retention_days)
+    else:
+        db.add(Setting(key="default_recording_retention_days", value=str(data.default_retention_days)))
     db.commit()
     return data
