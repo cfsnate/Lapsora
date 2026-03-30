@@ -250,6 +250,14 @@ class RecordingStorageStats(BaseModel):
 # --- Clip Exports ---
 
 
+class ClipExportCreate(BaseModel):
+    profile_id: int
+    start_time: datetime
+    end_time: datetime
+    quality_preset: str = "original"
+    resolution: str = "original"
+
+
 class ClipExportRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -263,6 +271,8 @@ class ClipExportRead(BaseModel):
     duration_seconds: float | None
     status: str
     error_message: str | None
+    quality_preset: str
+    resolution: str
     created_at: datetime
     completed_at: datetime | None
 

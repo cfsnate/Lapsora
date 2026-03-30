@@ -218,6 +218,8 @@ class ClipExport(Base):
     duration_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
     status: Mapped[str] = mapped_column(Text, default="pending")
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    quality_preset: Mapped[str] = mapped_column(Text, default="original")
+    resolution: Mapped[str] = mapped_column(Text, default="original")
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC))
     completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
 

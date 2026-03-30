@@ -100,7 +100,14 @@ Plans:
   2. User can choose export format and quality options before exporting
   3. Clip exports run in a separate queue that does not block timelapse generation
   4. Exported clips are downloadable from the UI
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+- [ ] 05-01-PLAN.md — Backend data layer: migration, model/schema updates, clip export service, export queue
+- [ ] 05-02-PLAN.md — Backend API: exports router, main.py wiring, test suite
+- [ ] 05-03-PLAN.md — Frontend types, API client, timeline range selection, export dialog
+- [ ] 05-04-PLAN.md — Frontend playback page wiring, exports listing page, navigation
+
 **UI hint**: yes
 
 ### Phase 6: Recording Notifications
