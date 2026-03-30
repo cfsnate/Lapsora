@@ -85,7 +85,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 04-01-PLAN.md — Backend playback API: playlist generation, segment serving, availability endpoint + tests
+- [x] 04-01-PLAN.md — Backend playback API: playlist generation, segment serving, availability endpoint + tests
 - [x] 04-02-PLAN.md — Frontend unified player (single video element for live+recording), playback controls, types, and API client methods
 - [ ] 04-03-PLAN.md — Zoomable timeline with gap visualization + unified live/recording playback page
 
