@@ -65,7 +65,11 @@ Plans:
   1. Old recording segments are automatically deleted when they exceed the configured rolling retention window
   2. User can protect specific recording segments to exempt them from auto-cleanup
   3. User can see current recording storage usage per profile
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — Backend retention engine: migration, cleanup service, protection API, storage stats
+- [ ] 03-02-PLAN.md — Frontend recording storage dashboard and test suite
 
 ### Phase 4: Playback Infrastructure
 **Goal**: Users can watch recorded footage via seamless HLS playback in the browser
