@@ -26,6 +26,7 @@ async def lifespan(app: FastAPI):
     (data_dir / "captures").mkdir(exist_ok=True)
     (data_dir / "timelapses").mkdir(exist_ok=True)
     (data_dir / "recordings").mkdir(exist_ok=True)
+    (data_dir / "exports").mkdir(exist_ok=True)
 
     # Run database migrations
     run_migrations(engine)
@@ -67,6 +68,10 @@ async def lifespan(app: FastAPI):
     from app.services.generation_queue import start_worker
     start_worker()
 
+    from app.services.export_queue import start_export_worker, restore_pending_exports
+    start_export_worker()
+    await restore_pending_exports()
+
     from app.services.recording import recording_manager
     await recording_manager.restore_all()
 
@@ -103,6 +108,8 @@ from app.routers import recording as recording_router
 app.include_router(recording_router.router)
 from app.routers import playback as playback_router
 app.include_router(playback_router.router)
+from app.routers import exports as exports_router
+app.include_router(exports_router.router)
 
 # Static file mounts
 data_dir = Path(app_settings.DATA_DIR)
