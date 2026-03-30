@@ -83,17 +83,17 @@ Which phases cover which requirements. Updated during roadmap creation.
 | REC-05 | Phase 1 | Complete |
 | STOR-01 | Phase 3 | Complete |
 | STOR-02 | Phase 3 | Complete |
-| PLAY-01 | Phase 5 | Pending |
-| PLAY-02 | Phase 5 | Pending |
+| PLAY-01 | Phase 4 | Pending |
+| PLAY-02 | Phase 4 | Pending |
 | PLAY-03 | Phase 4 | Pending |
-| PLAY-04 | Phase 5 | Pending |
-| PLAY-05 | Phase 5 | Pending |
-| EXPRT-01 | Phase 6 | Pending |
-| EXPRT-02 | Phase 6 | Pending |
-| EXPRT-03 | Phase 6 | Pending |
-| NOTIF-01 | Phase 7 | Pending |
-| NOTIF-02 | Phase 7 | Pending |
-| NOTIF-03 | Phase 7 | Pending |
+| PLAY-04 | Phase 4 | Pending |
+| PLAY-05 | Phase 4 | Pending |
+| EXPRT-01 | Phase 5 | Pending |
+| EXPRT-02 | Phase 5 | Pending |
+| EXPRT-03 | Phase 5 | Pending |
+| NOTIF-01 | Phase 6 | Pending |
+| NOTIF-02 | Phase 6 | Pending |
+| NOTIF-03 | Phase 6 | Pending |
 
 **Coverage:**
 - v1 requirements: 18 total

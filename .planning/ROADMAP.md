@@ -15,10 +15,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 1: Data Model & Recording Configuration** - Schema, migrations, and per-profile recording settings API and UI
 - [ ] **Phase 2: Recording Engine** - FFmpeg segmented recording with process management, watchdog, and auto-recovery
 - [ ] **Phase 3: Storage & Retention** - Rolling retention auto-cleanup and segment protection
-- [ ] **Phase 4: Playback Infrastructure** - Dynamic HLS playlist generation and segment serving for browser playback
-- [ ] **Phase 5: Timeline UI & Live View** - Timeline scrubber, gap visualization, live+recording combined page, and playback speed
-- [ ] **Phase 6: Clip Export** - Time-range clip extraction with format/quality options and independent export queue
-- [ ] **Phase 7: Recording Notifications** - Recording event, failure, and storage warning notifications
+- [ ] **Phase 4: Playback & Timeline** - HLS playback, unified live+recording player, timeline scrubber, gap visualization, speed controls
+- [ ] **Phase 5: Clip Export** - Time-range clip extraction with format/quality options and independent export queue
+- [ ] **Phase 6: Recording Notifications** - Recording event, failure, and storage warning notifications
 
 ## Phase Details
 
@@ -71,32 +70,24 @@ Plans:
 - [x] 03-01-PLAN.md — Backend retention engine: migration, cleanup service, protection API, storage stats
 - [x] 03-02-PLAN.md — Frontend recording storage dashboard and test suite
 
-### Phase 4: Playback Infrastructure
-**Goal**: Users can watch recorded footage via seamless HLS playback in the browser
+### Phase 4: Playback & Timeline
+**Goal**: Users can watch live and recorded footage on a unified page with a zoomable timeline scrubber
 **Depends on**: Phase 3
-**Requirements**: PLAY-03
+**Requirements**: PLAY-01, PLAY-02, PLAY-03, PLAY-04, PLAY-05
 **Success Criteria** (what must be TRUE):
   1. User can play back recorded footage for any time range with seamless cross-segment transitions
   2. Footage streams via HLS without requiring full file downloads
   3. Playback works in Chrome, Firefox, and Safari without plugins
+  4. User can navigate to any point in recorded history via a visual timeline scrubber with date/time selection
+  5. Gaps where recording is missing are visually indicated on the timeline
+  6. Live stream and recording timeline appear on the same page for each profile
+  7. User can adjust playback speed from 0.5x to 8x
 **Plans**: TBD
 **UI hint**: yes
 
-### Phase 5: Timeline UI & Live View
-**Goal**: Users can navigate their full recording history and monitor live streams from one page
-**Depends on**: Phase 4
-**Requirements**: PLAY-01, PLAY-02, PLAY-04, PLAY-05
-**Success Criteria** (what must be TRUE):
-  1. User can navigate to any point in recorded history via a visual timeline scrubber with date/time selection
-  2. Gaps where recording is missing are visually indicated on the timeline
-  3. Live stream and recording timeline appear on the same page for each profile
-  4. User can adjust playback speed from 0.5x to 8x
-**Plans**: TBD
-**UI hint**: yes
-
-### Phase 6: Clip Export
+### Phase 5: Clip Export
 **Goal**: Users can extract specific moments from recordings as downloadable video files
-**Depends on**: Phase 5
+**Depends on**: Phase 4
 **Requirements**: EXPRT-01, EXPRT-02, EXPRT-03
 **Success Criteria** (what must be TRUE):
   1. User can select start and end times and export that range as a video clip
@@ -106,7 +97,7 @@ Plans:
 **Plans**: TBD
 **UI hint**: yes
 
-### Phase 7: Recording Notifications
+### Phase 6: Recording Notifications
 **Goal**: Users are informed of recording events and storage issues without monitoring the UI
 **Depends on**: Phase 2
 **Requirements**: NOTIF-01, NOTIF-02, NOTIF-03
@@ -119,14 +110,13 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Data Model & Recording Configuration | 0/2 | Not started | - |
-| 2. Recording Engine | 0/? | Not started | - |
-| 3. Storage & Retention | 0/? | Not started | - |
-| 4. Playback Infrastructure | 0/? | Not started | - |
-| 5. Timeline UI & Live View | 0/? | Not started | - |
-| 6. Clip Export | 0/? | Not started | - |
-| 7. Recording Notifications | 0/? | Not started | - |
+| 1. Data Model & Recording Configuration | 2/2 | Complete | 2026-03-30 |
+| 2. Recording Engine | 3/3 | Complete | 2026-03-30 |
+| 3. Storage & Retention | 2/2 | Complete | 2026-03-30 |
+| 4. Playback & Timeline | 0/? | Not started | - |
+| 5. Clip Export | 0/? | Not started | - |
+| 6. Recording Notifications | 0/? | Not started | - |
