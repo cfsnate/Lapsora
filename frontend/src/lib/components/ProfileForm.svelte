@@ -54,6 +54,18 @@ let sun_events = $state<string[]>(
 	profile?.sun_events ? profile.sun_events.split(',').filter(Boolean) : ['daylight']
 );
 
+	let recording_enabled = $state(profile?.recording_enabled ?? false);
+	let recording_mode = $state(profile?.recording_mode ?? 'always');
+	let recording_start_time = $state(profile?.recording_start_time ?? '00:00');
+	let recording_end_time = $state(profile?.recording_end_time ?? '23:59');
+	let recording_sun_offset_minutes = $state(profile?.recording_sun_offset_minutes ?? 0);
+	let recording_sun_events = $state<string[]>(
+		profile?.recording_sun_events ? profile.recording_sun_events.split(',').filter(Boolean) : ['daylight']
+	);
+	let recording_days = $state<string[]>(
+		profile?.recording_days ? profile.recording_days.split(',').filter(Boolean) : []
+	);
+
 	function handleSubmit(e: SubmitEvent) {
 		e.preventDefault();
 		const data: ProfileCreate | ProfileUpdate = {
@@ -68,7 +80,14 @@ let sun_events = $state<string[]>(
 			active_start_time: capture_mode === 'manual' ? active_start_time : null,
 			active_end_time: capture_mode === 'manual' ? active_end_time : null,
 			sun_offset_minutes: capture_mode === 'sun' ? sun_offset_minutes : 0,
-		sun_events: capture_mode === 'sun' ? sun_events.join(',') : ''
+		sun_events: capture_mode === 'sun' ? sun_events.join(',') : '',
+			recording_enabled,
+			recording_mode: recording_enabled ? recording_mode : 'always',
+			recording_start_time: recording_enabled && recording_mode === 'scheduled' ? recording_start_time : null,
+			recording_end_time: recording_enabled && recording_mode === 'scheduled' ? recording_end_time : null,
+			recording_sun_offset_minutes: recording_enabled && recording_mode === 'sun' ? recording_sun_offset_minutes : 0,
+			recording_sun_events: recording_enabled && recording_mode === 'sun' ? recording_sun_events.join(',') : '',
+			recording_days: recording_enabled && recording_mode === 'scheduled' ? recording_days.join(',') : ''
 		};
 		onsubmit(data);
 	}
@@ -249,6 +268,128 @@ let sun_events = $state<string[]>(
 			<p class="mt-1 text-xs text-gray-500">Select which parts of the day to capture. Multiple selections are combined.</p>
 		</div>
 	{/if}
+
+	<div class="mt-6 border-t border-gray-700 pt-5">
+		<label class="mb-2 block text-sm font-medium text-gray-300">Recording</label>
+
+		<div class="flex items-center gap-3">
+			<input
+				id="recording-enabled"
+				type="checkbox"
+				bind:checked={recording_enabled}
+				class="h-4 w-4 rounded border-gray-600 bg-gray-900 text-blue-500 focus:ring-blue-500"
+			/>
+			<label for="recording-enabled" class="text-sm font-medium text-gray-300">Enable recording</label>
+		</div>
+
+		{#if recording_enabled}
+			<div class="mt-4">
+				<label class="mb-2 block text-sm font-medium text-gray-300">Recording schedule</label>
+				<div class="flex gap-4">
+					<label class="flex items-center gap-2 text-sm text-gray-300">
+						<input type="radio" bind:group={recording_mode} value="always" class="text-blue-500" />
+						Always
+					</label>
+					<label class="flex items-center gap-2 text-sm text-gray-300">
+						<input type="radio" bind:group={recording_mode} value="scheduled" class="text-blue-500" />
+						Scheduled hours
+					</label>
+					<label class="flex items-center gap-2 text-sm text-gray-300">
+						<input type="radio" bind:group={recording_mode} value="manual" class="text-blue-500" />
+						Manual
+					</label>
+					<label class="flex items-center gap-2 text-sm text-gray-300">
+						<input type="radio" bind:group={recording_mode} value="sun" class="text-blue-500" />
+						Sunrise/Sunset
+					</label>
+				</div>
+			</div>
+
+			{#if recording_mode === 'scheduled'}
+				<div class="mt-4 grid grid-cols-2 gap-4">
+					<div>
+						<label for="rec-start" class="mb-1 block text-sm font-medium text-gray-300">Start time</label>
+						<input
+							id="rec-start"
+							type="text"
+							bind:value={recording_start_time}
+							placeholder="HH:MM"
+							pattern={timePattern}
+							class="w-full rounded-md border border-gray-600 bg-gray-900 px-3 py-2 text-gray-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+						/>
+					</div>
+					<div>
+						<label for="rec-end" class="mb-1 block text-sm font-medium text-gray-300">End time</label>
+						<input
+							id="rec-end"
+							type="text"
+							bind:value={recording_end_time}
+							placeholder="HH:MM"
+							pattern={timePattern}
+							class="w-full rounded-md border border-gray-600 bg-gray-900 px-3 py-2 text-gray-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+						/>
+					</div>
+				</div>
+				<p class="mt-1 text-xs text-gray-500">If start is after end, the window spans overnight (e.g. 22:00–04:00).</p>
+
+				<div class="mt-3">
+					<label class="mb-2 block text-sm font-medium text-gray-300">Active days</label>
+					<div class="flex flex-wrap gap-3">
+						{#each [
+							{ value: 'mon', label: 'Mon' },
+							{ value: 'tue', label: 'Tue' },
+							{ value: 'wed', label: 'Wed' },
+							{ value: 'thu', label: 'Thu' },
+							{ value: 'fri', label: 'Fri' },
+							{ value: 'sat', label: 'Sat' },
+							{ value: 'sun', label: 'Sun' }
+						] as day}
+							<label class="flex items-center gap-1.5 text-sm text-gray-300">
+								<input type="checkbox" value={day.value} bind:group={recording_days} class="h-4 w-4 rounded border-gray-600 bg-gray-900 text-blue-500 focus:ring-blue-500" />
+								{day.label}
+							</label>
+						{/each}
+					</div>
+					<p class="mt-1 text-xs text-gray-500">Leave all unchecked to record every day.</p>
+				</div>
+			{/if}
+
+			{#if recording_mode === 'sun'}
+				<div class="mt-4">
+					<label for="rec-sun-offset" class="mb-1 block text-sm font-medium text-gray-300">Offset (minutes)</label>
+					<input
+						id="rec-sun-offset"
+						type="number"
+						bind:value={recording_sun_offset_minutes}
+						class="w-full rounded-md border border-gray-600 bg-gray-900 px-3 py-2 text-gray-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+					/>
+					<p class="mt-1 text-xs text-gray-500">Positive values extend the window (record before sunrise / after sunset). Negative values shrink it. Requires location in Settings.</p>
+				</div>
+				<div class="mt-3">
+					<label class="mb-2 block text-sm font-medium text-gray-300">Sun events</label>
+					<div class="space-y-2 rounded-md border border-gray-700 bg-gray-900 p-3">
+						<label class="flex items-center gap-2 text-sm text-gray-300">
+							<input type="checkbox" value="daylight" bind:group={recording_sun_events} class="h-4 w-4 rounded border-gray-600 bg-gray-900 text-blue-500 focus:ring-blue-500" />
+							Daylight <span class="text-gray-500">(sunrise to sunset)</span>
+						</label>
+						<label class="flex items-center gap-2 text-sm text-gray-300">
+							<input type="checkbox" value="golden_hour" bind:group={recording_sun_events} class="h-4 w-4 rounded border-gray-600 bg-gray-900 text-blue-500 focus:ring-blue-500" />
+							Golden hour <span class="text-gray-500">(warm light after sunrise / before sunset)</span>
+						</label>
+						<label class="flex items-center gap-2 text-sm text-gray-300">
+							<input type="checkbox" value="blue_hour" bind:group={recording_sun_events} class="h-4 w-4 rounded border-gray-600 bg-gray-900 text-blue-500 focus:ring-blue-500" />
+							Blue hour <span class="text-gray-500">(twilight before sunrise / after sunset)</span>
+						</label>
+						<label class="flex items-center gap-2 text-sm text-gray-300">
+							<input type="checkbox" value="night" bind:group={recording_sun_events} class="h-4 w-4 rounded border-gray-600 bg-gray-900 text-blue-500 focus:ring-blue-500" />
+							Night <span class="text-gray-500">(dusk to dawn)</span>
+						</label>
+					</div>
+					<p class="mt-1 text-xs text-gray-500">Select which parts of the day to record. Multiple selections are combined.</p>
+				</div>
+			{/if}
+		{/if}
+	</div>
 
 	<button
 		type="submit"
