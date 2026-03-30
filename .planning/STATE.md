@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-01-PLAN.md
-last_updated: "2026-03-30T22:34:15.237Z"
+stopped_at: Completed 05-03-PLAN.md
+last_updated: "2026-03-30T22:35:37.823Z"
 last_activity: 2026-03-30
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 14
-  completed_plans: 11
+  completed_plans: 12
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 ## Current Position
 
 Phase: 05 (clip-export) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-03-30
 
@@ -63,6 +63,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 04 P01 | 3min | 2 tasks | 4 files |
 | Phase 04 P03 | 2min | 2 tasks | 3 files |
 | Phase 05 P01 | 1min | 2 tasks | 5 files |
+| Phase 05 P03 | 3min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -97,6 +98,8 @@ Recent decisions affecting current work:
 - [Phase 05]: Export queue fully independent from generation queue — no shared state
 - [Phase 05]: CRF quality mapping: high=18, medium=23, low=28 for libx264 re-encoding
 - [Phase 05]: Stream copy for original quality, FFmpeg concat demuxer for multi-segment clips
+- [Phase 05]: ExportDialog mirrors GenerateDialog pattern for UI consistency
+- [Phase 05]: Shift+click two-step selection for timeline range picking (start, end, clear cycle)
 
 ### Pending Todos
 
@@ -108,6 +111,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-30T22:34:15.234Z
-Stopped at: Completed 05-01-PLAN.md
+Last session: 2026-03-30T22:35:37.820Z
+Stopped at: Completed 05-03-PLAN.md
 Resume file: None
