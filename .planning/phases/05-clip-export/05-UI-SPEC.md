@@ -200,7 +200,7 @@ Modal dialog for configuring and submitting a clip export. Pattern mirrors Gener
 |---------|------|
 | Overlay | `fixed inset-0 z-50 flex items-center justify-center bg-black/60` — backdrop click closes |
 | Panel | `w-full max-w-md rounded-lg bg-gray-800 p-6` |
-| Title | `mb-4 text-xl font-semibold text-gray-100` — "Export Clip" |
+| Title | `mb-4 text-lg font-bold text-gray-100` — "Export Clip" |
 | Error display | `mb-3 rounded-md bg-red-900/50 px-3 py-2 text-sm text-red-300` |
 | Form layout | `space-y-4` |
 | Start time field | `<input type="datetime-local">` — pre-filled from selection, editable. Styled: `w-full rounded-md border border-gray-600 bg-gray-900 px-3 py-2 text-gray-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500` |
@@ -209,8 +209,8 @@ Modal dialog for configuring and submitting a clip export. Pattern mirrors Gener
 | Quality preset select | `<select>` with options: Original, High, Medium, Low. Same select styling as GenerateDialog. |
 | Quality note | `text-xs text-gray-500 mt-1` — "Original copies the stream directly — boundaries may shift ~1-2s to the nearest keyframe." Visible only when "Original" is selected. |
 | Resolution select | `<select>` with options: Original, 1080p, 720p, 480p. Same select styling. Hidden when quality = "Original". |
-| Cancel button | `flex-1 rounded-md bg-gray-700 px-4 py-2 font-medium text-gray-300 hover:bg-gray-600` |
-| Export button | `flex-1 rounded-md bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 disabled:opacity-50` — label: "Export Clip" |
+| Cancel button | `flex-1 rounded-md bg-gray-700 px-4 py-2 font-bold text-gray-300 hover:bg-gray-600` |
+| Export button | `flex-1 rounded-md bg-blue-600 px-4 py-2 font-bold text-white hover:bg-blue-700 disabled:opacity-50` — label: "Export Clip" |
 
 Props:
 
@@ -229,7 +229,7 @@ Conditionally rendered when a timeline range is selected:
 
 | Element | Spec |
 |---------|------|
-| Button | `rounded-md bg-blue-600 px-4 py-2 text-xs font-medium text-white hover:bg-blue-500 transition-colors` |
+| Button | `rounded-md bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-500 transition-colors` |
 | Icon | 14×14px inline SVG scissors/clip icon (Heroicons `scissors` outline), `mr-2` |
 | Position | Right-aligned in controls bar, after speed buttons, separated by `ml-auto` |
 | Visibility | Hidden when `selectionStart` and `selectionEnd` are both null |
@@ -250,12 +250,12 @@ Listing page for all clip exports. Pattern mirrors `timelapses/+page.svelte`.
 | Page heading | `text-3xl font-bold text-white` — "Clip Exports" |
 | Status filter | `<select>` — "All", "Pending", "Processing", "Completed", "Failed". Same select styling as timelapses page filters. |
 | Export row card | Status-tinted card (see Layout Specifications above) |
-| Row line 1: status + stream | `flex items-center gap-2` — status icon + label (`text-xs font-medium`), stream/profile name (`text-sm text-gray-200`) |
+| Row line 1: status + stream | `flex items-center gap-2` — status icon + label (`text-xs font-bold`), stream/profile name (`text-sm text-gray-200`) |
 | Row line 2: metadata | `flex items-center gap-2 text-xs text-gray-400` — time range (`font-mono`), quality preset, resolution (if not original), file size (if completed) separated by `·` |
 | Row line 3: actions | `flex items-center gap-1 mt-2` — right-aligned action buttons |
-| Download button | `inline-flex items-center rounded px-3 py-2 text-xs font-medium text-blue-400 hover:bg-gray-800` (with download SVG icon, matches timelapse download) — label: "Download Clip" |
-| Cancel button | `inline-flex items-center rounded px-3 py-2 text-xs font-medium text-yellow-400 hover:bg-gray-800` (with X SVG icon) — visible for pending/processing |
-| Delete button | `inline-flex items-center rounded px-3 py-2 text-xs font-medium text-red-400 hover:bg-gray-800` (with trash SVG icon, matches timelapse delete) — visible for completed/failed — label: "Delete Clip" |
+| Download button | `inline-flex items-center rounded px-3 py-2 text-xs font-bold text-blue-400 hover:bg-gray-800` (with download SVG icon, matches timelapse download) — label: "Download Clip" |
+| Cancel button | `inline-flex items-center rounded px-3 py-2 text-xs font-bold text-yellow-400 hover:bg-gray-800` (with X SVG icon) — visible for pending/processing |
+| Delete button | `inline-flex items-center rounded px-3 py-2 text-xs font-bold text-red-400 hover:bg-gray-800` (with trash SVG icon, matches timelapse delete) — visible for completed/failed — label: "Delete Clip" |
 
 Status icons (inline SVG, 16×16px):
 
@@ -274,10 +274,10 @@ Pattern identical to timelapses page delete modal:
 |---------|------|
 | Overlay | `fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm` |
 | Panel | `w-full max-w-sm rounded-xl bg-gray-900 p-6 shadow-xl` |
-| Title | `mb-2 text-lg font-semibold text-gray-100` |
+| Title | `mb-2 text-lg font-bold text-gray-100` |
 | Body | `mb-4 text-sm text-gray-400` |
-| Cancel button | `rounded-lg bg-gray-700 px-4 py-2 text-sm font-medium text-gray-300 hover:bg-gray-600` |
-| Confirm button | `rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-50` |
+| Cancel button | `rounded-lg bg-gray-700 px-4 py-2 text-sm font-bold text-gray-300 hover:bg-gray-600` |
+| Confirm button | `rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-500 disabled:opacity-50` |
 
 ### Cancel Confirmation Modal
 
@@ -285,7 +285,8 @@ Same structural pattern as delete confirmation, but for cancelling in-progress e
 
 | Element | Spec |
 |---------|------|
-| Confirm button | `rounded-lg bg-yellow-600 px-4 py-2 text-sm font-medium text-white hover:bg-yellow-500 disabled:opacity-50` |
+| Dismiss button | `rounded-lg bg-gray-700 px-4 py-2 text-sm font-bold text-gray-300 hover:bg-gray-600` — label: "Keep Export" |
+| Confirm button | `rounded-lg bg-yellow-600 px-4 py-2 text-sm font-bold text-white hover:bg-yellow-500 disabled:opacity-50` |
 
 ---
 
@@ -361,6 +362,7 @@ Same structural pattern as delete confirmation, but for cancelling in-progress e
 | Delete loading label | "Deleting..." |
 | Cancel confirmation title | "Cancel Export" |
 | Cancel confirmation body | "Cancel this export? It cannot be resumed." |
+| Cancel confirmation dismiss | "Keep Export" |
 | Cancel button label | "Cancel Export" |
 | Cancel loading label | "Cancelling..." |
 | Status label: pending | "Pending" |
