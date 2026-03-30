@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
-stopped_at: Completed 03-02-PLAN.md
-last_updated: "2026-03-30T20:13:36.660Z"
+status: executing
+stopped_at: Completed 04-02-PLAN.md
+last_updated: "2026-03-30T21:19:44.421Z"
 last_activity: 2026-03-30
 progress:
-  total_phases: 7
+  total_phases: 6
   completed_phases: 3
-  total_plans: 7
-  completed_plans: 7
+  total_plans: 10
+  completed_plans: 8
   percent: 0
 ---
 
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-30)
 
 **Core value:** Users can record, review, and export video from their RTSP cameras without relying on cloud services or third-party NVR software.
-**Current focus:** Phase 03 — storage-retention
+**Current focus:** Phase 04 — playback-infrastructure
 
 ## Current Position
 
-Phase: 03 (storage-retention) — EXECUTING
-Plan: 2 of 2
-Status: Phase complete — ready for verification
+Phase: 04 (playback-infrastructure) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
 Last activity: 2026-03-30
 
 Progress: [░░░░░░░░░░] 0%
@@ -59,6 +59,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 02 P02 | 3min | 2 tasks | 4 files |
 | Phase 03 P01 | 3min | 3 tasks | 9 files |
 | Phase 03 P02 | 3min | 2 tasks | 4 files |
+| Phase 04 P02 | 2min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -85,6 +86,7 @@ Recent decisions affecting current work:
 - [Phase 03]: Per-profile recording_retention_days nullable — NULL means use global default (14 days)
 - [Phase 03]: Tests mock SessionLocal to inject test db session — avoids Docker dependency for local testing
 - [Phase 03]: Recording bytes shown as green segment between captures (blue) and timelapses (purple) in disk bar
+- [Phase 04]: getPlaylistUrl/getSegmentUrl return URL strings (not fetch) — HLS.js loads URLs directly
 
 ### Pending Todos
 
@@ -96,6 +98,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-30T20:13:36.657Z
-Stopped at: Completed 03-02-PLAN.md
+Last session: 2026-03-30T21:19:44.417Z
+Stopped at: Completed 04-02-PLAN.md
 Resume file: None
