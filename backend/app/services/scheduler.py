@@ -281,6 +281,83 @@ def remove_segment_scanner_job() -> None:
         logger.debug("Segment scanner job not found, nothing to remove")
 
 
+def add_recording_cleanup_job() -> None:
+    """Add hourly recording segment cleanup job."""
+    from app.services.retention import _get_effective_retention, run_recording_cleanup
+
+    async def _run_recording_cleanup():
+        from app.database import SessionLocal
+
+        db = SessionLocal()
+        try:
+            profiles = db.query(Profile).filter(Profile.recording_enabled.is_(True)).all()
+            for profile in profiles:
+                try:
+                    retention_days = _get_effective_retention(profile, db)
+                    await run_recording_cleanup(profile.id, retention_days)
+                except Exception:
+                    logger.exception(
+                        "Recording cleanup failed for profile %d", profile.id
+                    )
+        finally:
+            db.rollback()
+            db.close()
+
+    scheduler.add_job(
+        _run_recording_cleanup,
+        "interval",
+        seconds=3600,
+        id="recording_cleanup",
+        replace_existing=True,
+    )
+    logger.info("Recording cleanup job scheduled every 3600s")
+
+
+def remove_recording_cleanup_job() -> None:
+    """Remove the recording cleanup job."""
+    try:
+        scheduler.remove_job("recording_cleanup")
+        logger.info("Removed recording cleanup job")
+    except Exception:
+        logger.debug("Recording cleanup job not found, nothing to remove")
+
+
+def add_watermark_check_job() -> None:
+    """Add 5-minute disk watermark check job for emergency cleanup."""
+    import shutil
+
+    from app.config import settings
+    from app.services.retention import run_emergency_recording_cleanup
+
+    async def _check_watermark():
+        try:
+            usage = shutil.disk_usage(settings.DATA_DIR)
+            used_pct = (usage.used / usage.total) * 100 if usage.total > 0 else 0
+            if used_pct > 90:
+                logger.warning("Disk at %.1f%%, triggering emergency recording cleanup", used_pct)
+                await run_emergency_recording_cleanup(target_pct=80)
+        except Exception:
+            logger.exception("Watermark check failed")
+
+    scheduler.add_job(
+        _check_watermark,
+        "interval",
+        seconds=300,
+        id="watermark_check",
+        replace_existing=True,
+    )
+    logger.info("Watermark check job scheduled every 300s")
+
+
+def remove_watermark_check_job() -> None:
+    """Remove the watermark check job."""
+    try:
+        scheduler.remove_job("watermark_check")
+        logger.info("Removed watermark check job")
+    except Exception:
+        logger.debug("Watermark check job not found, nothing to remove")
+
+
 def add_health_check_job(interval_seconds: int = 300) -> None:
     """Add periodic stream health check job."""
     from app.services.health import check_all_streams

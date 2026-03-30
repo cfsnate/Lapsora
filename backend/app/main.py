@@ -59,8 +59,10 @@ async def lifespan(app: FastAPI):
     if gap_enabled:
         add_capture_gap_job()
 
-    from app.services.scheduler import add_segment_scanner_job
+    from app.services.scheduler import add_segment_scanner_job, add_recording_cleanup_job, add_watermark_check_job
     add_segment_scanner_job()
+    add_recording_cleanup_job()
+    add_watermark_check_job()
 
     from app.services.generation_queue import start_worker
     start_worker()
