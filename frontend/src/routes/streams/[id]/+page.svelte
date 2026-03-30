@@ -236,10 +236,16 @@
 				</svg>
 			</a>
 			<h1 class="text-3xl font-bold text-white">{stream.name}</h1>
-			<span class="rounded-full px-2 py-0.5 text-xs font-medium {stream.enabled ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}">
-				{stream.enabled ? 'Enabled' : 'Disabled'}
-			</span>
-		</div>
+		<span class="rounded-full px-2 py-0.5 text-xs font-medium {stream.enabled ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}">
+			{stream.enabled ? 'Enabled' : 'Disabled'}
+		</span>
+		<a
+			href="/streams/{id}/playback"
+			class="ml-auto rounded-lg bg-gray-800 px-3 py-1.5 text-sm font-medium text-gray-300 transition-colors hover:bg-gray-700 hover:text-white"
+		>
+			Playback
+		</a>
+	</div>
 
 		<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
 			<!-- Live Preview -->
