@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
-stopped_at: Completed 04-03-PLAN.md
-last_updated: "2026-03-30T21:34:06.316Z"
+status: executing
+stopped_at: Completed 05-01-PLAN.md
+last_updated: "2026-03-30T22:34:15.237Z"
 last_activity: 2026-03-30
 progress:
   total_phases: 6
   completed_phases: 4
-  total_plans: 10
-  completed_plans: 10
+  total_plans: 14
+  completed_plans: 11
   percent: 0
 ---
 
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-30)
 
 **Core value:** Users can record, review, and export video from their RTSP cameras without relying on cloud services or third-party NVR software.
-**Current focus:** Phase 04 — playback-infrastructure
+**Current focus:** Phase 05 — clip-export
 
 ## Current Position
 
-Phase: 5
-Plan: Not started
-Status: Phase complete — ready for verification
+Phase: 05 (clip-export) — EXECUTING
+Plan: 2 of 4
+Status: Ready to execute
 Last activity: 2026-03-30
 
 Progress: [░░░░░░░░░░] 0%
@@ -62,6 +62,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 04 P02 | 2min | 2 tasks | 5 files |
 | Phase 04 P01 | 3min | 2 tasks | 4 files |
 | Phase 04 P03 | 2min | 2 tasks | 3 files |
+| Phase 05 P01 | 1min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -93,6 +94,9 @@ Recent decisions affecting current work:
 - [Phase 04]: Availability ranges merged in-place using isoformat comparison for overlap detection
 - [Phase 04]: Single UnifiedPlayer component drives both live and recording — no separate player imports on playback page
 - [Phase 04]: Auto-refetch HLS playlist when playback time approaches window boundary (within 5 min)
+- [Phase 05]: Export queue fully independent from generation queue — no shared state
+- [Phase 05]: CRF quality mapping: high=18, medium=23, low=28 for libx264 re-encoding
+- [Phase 05]: Stream copy for original quality, FFmpeg concat demuxer for multi-segment clips
 
 ### Pending Todos
 
@@ -104,6 +108,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-30T21:25:16.485Z
-Stopped at: Completed 04-03-PLAN.md
+Last session: 2026-03-30T22:34:15.234Z
+Stopped at: Completed 05-01-PLAN.md
 Resume file: None

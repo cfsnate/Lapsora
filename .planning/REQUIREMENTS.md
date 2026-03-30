@@ -30,9 +30,9 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Clip Export
 
-- [ ] **EXPRT-01**: User can select start and end times and export that range as an MP4 clip
-- [ ] **EXPRT-02**: User can choose export format and quality options (codec, quality preset)
-- [ ] **EXPRT-03**: Clip exports run in an independent queue separate from timelapse generation
+- [x] **EXPRT-01**: User can select start and end times and export that range as an MP4 clip
+- [x] **EXPRT-02**: User can choose export format and quality options (codec, quality preset)
+- [x] **EXPRT-03**: Clip exports run in an independent queue separate from timelapse generation
 
 ### Notifications
 
@@ -88,9 +88,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PLAY-03 | Phase 4 | Complete |
 | PLAY-04 | Phase 4 | Complete |
 | PLAY-05 | Phase 4 | Complete |
-| EXPRT-01 | Phase 5 | Pending |
-| EXPRT-02 | Phase 5 | Pending |
-| EXPRT-03 | Phase 5 | Pending |
+| EXPRT-01 | Phase 5 | Complete |
+| EXPRT-02 | Phase 5 | Complete |
+| EXPRT-03 | Phase 5 | Complete |
 | NOTIF-01 | Phase 6 | Pending |
 | NOTIF-02 | Phase 6 | Pending |
 | NOTIF-03 | Phase 6 | Pending |
