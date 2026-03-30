@@ -63,6 +63,15 @@ class ProfileCreate(BaseModel):
     sun_offset_minutes: int = Field(default=0, ge=0, le=180)
     sun_events: str = ""
     weather_enabled: bool = False
+    recording_enabled: bool = False
+    recording_mode: Literal["always", "scheduled", "manual", "sun"] = "always"
+    recording_start_time: str | None = None
+    recording_end_time: str | None = None
+    recording_sun_offset_minutes: int = Field(default=0, ge=0, le=180)
+    recording_sun_events: str = ""
+    segment_duration_seconds: int = Field(default=600, ge=30, le=3600)
+    recording_storage_path: str | None = None
+    recording_days: str = ""
 
 
 class ProfileUpdate(BaseModel):
@@ -79,6 +88,15 @@ class ProfileUpdate(BaseModel):
     sun_offset_minutes: int | None = None
     sun_events: str | None = None
     weather_enabled: bool | None = None
+    recording_enabled: bool | None = None
+    recording_mode: Literal["always", "scheduled", "manual", "sun"] | None = None
+    recording_start_time: str | None = None
+    recording_end_time: str | None = None
+    recording_sun_offset_minutes: int | None = None
+    recording_sun_events: str | None = None
+    segment_duration_seconds: int | None = None
+    recording_storage_path: str | None = None
+    recording_days: str | None = None
 
 
 class ProfileRead(BaseModel):
@@ -100,6 +118,15 @@ class ProfileRead(BaseModel):
     sun_offset_minutes: int
     sun_events: str
     weather_enabled: bool
+    recording_enabled: bool
+    recording_mode: str
+    recording_start_time: str | None
+    recording_end_time: str | None
+    recording_sun_offset_minutes: int
+    recording_sun_events: str
+    segment_duration_seconds: int
+    recording_storage_path: str | None
+    recording_days: str
     source_template_id: int | None = None
     created_at: datetime
     updated_at: datetime
@@ -167,6 +194,46 @@ class CaptureRead(BaseModel):
     weather_temp: float | None = None
     weather_code: int | None = None
     captured_at: datetime
+
+
+# --- Recording Segments ---
+
+
+class RecordingSegmentRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    profile_id: int
+    file_path: str
+    file_size: int | None
+    duration_seconds: float | None
+    start_time: datetime
+    end_time: datetime | None
+    codec: str | None
+    resolution_width: int | None
+    resolution_height: int | None
+    protected: bool
+    created_at: datetime
+
+
+# --- Clip Exports ---
+
+
+class ClipExportRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    profile_id: int
+    file_path: str | None
+    file_size: int | None
+    format: str
+    start_time: datetime
+    end_time: datetime
+    duration_seconds: float | None
+    status: str
+    error_message: str | None
+    created_at: datetime
+    completed_at: datetime | None
 
 
 # --- Timelapses ---

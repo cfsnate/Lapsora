@@ -61,7 +61,10 @@ def update_profile(profile_id: int, body: ProfileUpdate, db: Session = Depends(g
     needs_reschedule = any(
         k in update_data
         for k in ("interval_seconds", "enabled", "capture_mode", "active_start_time",
-                   "active_end_time", "sun_events", "sun_offset_minutes")
+                   "active_end_time", "sun_events", "sun_offset_minutes",
+                   "recording_enabled", "recording_mode", "recording_start_time",
+                   "recording_end_time", "recording_sun_events", "recording_sun_offset_minutes",
+                   "recording_days")
     )
 
     for key, value in update_data.items():
