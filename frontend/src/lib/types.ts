@@ -59,6 +59,7 @@ export interface Profile {
 	segment_duration_seconds: number;
 	recording_storage_path: string | null;
 	recording_days: string;
+	recording_retention_days: number | null;
 	source_template_id: number | null;
 	created_at: string;
 	updated_at: string;
@@ -329,6 +330,21 @@ export interface StorageStats {
 	total_size_bytes: number;
 	disk_free_bytes: number;
 	disk_total_bytes: number;
+}
+
+export interface RecordingStorageProfile {
+	profile_id: number;
+	segment_count: number;
+	total_bytes: number;
+	protected_count: number;
+	oldest_recording: string | null;
+	newest_recording: string | null;
+}
+
+export interface RecordingStorageStats {
+	total_segments: number;
+	total_bytes: number;
+	profiles: RecordingStorageProfile[];
 }
 
 export interface Notification {

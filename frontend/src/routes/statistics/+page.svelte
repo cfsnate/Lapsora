@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { api } from '$lib/api';
-	import type { StatsSummary, StorageTrendPoint, CaptureActivityPoint, ProfileStoragePoint, Profile, Stream, StorageStats, TimelapseSummary } from '$lib/types';
+	import type { StatsSummary, StorageTrendPoint, CaptureActivityPoint, ProfileStoragePoint, Profile, Stream, StorageStats, TimelapseSummary, RecordingStorageStats } from '$lib/types';
 	import { formatBytes, formatDuration, formatDateTime } from '$lib/utils';
 	import LineChart from '$lib/components/LineChart.svelte';
 	import type uPlot from 'uplot';
@@ -13,6 +13,7 @@
 	let streams = $state<Stream[]>([]);
 	let storageStats = $state<StorageStats | null>(null);
 	let timelapseSummary = $state<TimelapseSummary | null>(null);
+	let recordingStorage = $state<RecordingStorageStats | null>(null);
 
 	let trendDays = $state(90);
 	let activityDays = $state(30);
@@ -84,8 +85,14 @@
 		} catch {}
 	}
 
+	async function loadRecordingStorage() {
+		try {
+			recordingStorage = await api.getRecordingStorage();
+		} catch {}
+	}
+
 	$effect(() => {
-		Promise.all([loadProfiles(), loadSummary(), loadStorageStats(), loadTimelapseSummary()]).then(() => { loading = false; });
+		Promise.all([loadProfiles(), loadSummary(), loadStorageStats(), loadTimelapseSummary(), loadRecordingStorage()]).then(() => { loading = false; });
 	});
 
 	$effect(() => { trendDays; loadTrend(); });
@@ -216,8 +223,9 @@
 		<!-- Disk Usage Breakdown -->
 		{#if storageStats}
 			{@const capturesBytes = storageStats.captures_size_bytes}
+			{@const recordingBytes = recordingStorage?.total_bytes ?? 0}
 			{@const timelapsesBytes = storageStats.timelapses_size_bytes}
-			{@const otherBytes = Math.max(0, storageStats.disk_total_bytes - storageStats.disk_free_bytes - storageStats.total_size_bytes)}
+			{@const otherBytes = Math.max(0, storageStats.disk_total_bytes - storageStats.disk_free_bytes - storageStats.total_size_bytes - recordingBytes)}
 			{@const freeBytes = storageStats.disk_free_bytes}
 			{@const totalDisk = storageStats.disk_total_bytes || 1}
 			<div class="rounded-lg border border-gray-800 bg-gray-900 p-4">
@@ -225,6 +233,9 @@
 				<div class="mb-4 flex h-6 w-full overflow-hidden rounded-full bg-gray-800">
 					{#if capturesBytes > 0}
 						<div class="bg-blue-500 transition-all" style="width: {(capturesBytes / totalDisk) * 100}%" title="Captures: {formatBytes(capturesBytes)}"></div>
+					{/if}
+					{#if recordingBytes > 0}
+						<div class="bg-green-500 transition-all" style="width: {(recordingBytes / totalDisk) * 100}%" title="Recordings: {formatBytes(recordingBytes)}"></div>
 					{/if}
 					{#if timelapsesBytes > 0}
 						<div class="bg-purple-500 transition-all" style="width: {(timelapsesBytes / totalDisk) * 100}%" title="Timelapses: {formatBytes(timelapsesBytes)}"></div>
@@ -236,13 +247,20 @@
 						<div class="bg-gray-600 transition-all" style="width: {(freeBytes / totalDisk) * 100}%" title="Free: {formatBytes(freeBytes)}"></div>
 					{/if}
 				</div>
-				<div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+				<div class="grid grid-cols-2 gap-4 sm:grid-cols-5">
 					<div class="rounded-lg border border-gray-800 bg-gray-950 p-3">
 						<div class="flex items-center gap-2">
 							<div class="h-3 w-3 rounded-full bg-blue-500"></div>
 							<p class="text-sm text-gray-400">Captures</p>
 						</div>
 						<p class="mt-1 text-lg font-bold text-white">{formatBytes(capturesBytes)}</p>
+					</div>
+					<div class="rounded-lg border border-gray-800 bg-gray-950 p-3">
+						<div class="flex items-center gap-2">
+							<div class="h-3 w-3 rounded-full bg-green-500"></div>
+							<p class="text-sm text-gray-400">Recordings</p>
+						</div>
+						<p class="mt-1 text-lg font-bold text-white">{formatBytes(recordingBytes)}</p>
 					</div>
 					<div class="rounded-lg border border-gray-800 bg-gray-950 p-3">
 						<div class="flex items-center gap-2">
@@ -268,6 +286,57 @@
 				</div>
 			</div>
 		{/if}
+
+		<!-- Recording Storage -->
+		<div class="rounded-lg border border-gray-800 bg-gray-900 p-4">
+			<h2 class="mb-3 text-lg font-semibold text-white">Recording Storage</h2>
+			{#if recordingStorage && recordingStorage.total_segments > 0}
+				<div class="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+					<div class="rounded-lg border border-gray-800 bg-gray-950 p-3">
+						<p class="text-sm text-gray-400">Total Segments</p>
+						<p class="mt-1 text-lg font-bold text-white">{recordingStorage.total_segments.toLocaleString()}</p>
+					</div>
+					<div class="rounded-lg border border-gray-800 bg-gray-950 p-3">
+						<p class="text-sm text-gray-400">Total Size</p>
+						<p class="mt-1 text-lg font-bold text-white">{formatBytes(recordingStorage.total_bytes)}</p>
+					</div>
+					<div class="rounded-lg border border-gray-800 bg-gray-950 p-3">
+						<p class="text-sm text-gray-400">Protected Segments</p>
+						<p class="mt-1 text-lg font-bold text-white">{recordingStorage.profiles.reduce((s, p) => s + p.protected_count, 0).toLocaleString()}</p>
+					</div>
+				</div>
+				{#if recordingStorage.profiles.length}
+					<div class="overflow-x-auto">
+						<table class="w-full text-left text-sm">
+							<thead>
+								<tr class="border-b border-gray-800 text-gray-400">
+									<th class="pb-2 pr-4">Profile</th>
+									<th class="pb-2 pr-4">Segments</th>
+									<th class="pb-2 pr-4">Size</th>
+									<th class="pb-2 pr-4">Protected</th>
+									<th class="pb-2 pr-4">Oldest</th>
+									<th class="pb-2">Newest</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each recordingStorage.profiles as rp}
+									<tr class="border-b border-gray-800/50">
+										<td class="py-2 pr-4 text-white">{profileName(rp.profile_id)}</td>
+										<td class="py-2 pr-4 text-white">{rp.segment_count.toLocaleString()}</td>
+										<td class="py-2 pr-4 text-white">{formatBytes(rp.total_bytes)}</td>
+										<td class="py-2 pr-4 text-white">{rp.protected_count.toLocaleString()}</td>
+										<td class="py-2 pr-4 text-gray-400">{rp.oldest_recording ? formatDateTime(rp.oldest_recording) : '—'}</td>
+										<td class="py-2 text-gray-400">{rp.newest_recording ? formatDateTime(rp.newest_recording) : '—'}</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				{/if}
+			{:else}
+				<p class="py-4 text-center text-gray-500">No recordings yet</p>
+			{/if}
+		</div>
 
 		<!-- Storage Trend -->
 		<div class="rounded-lg border border-gray-800 bg-gray-900 p-4">
