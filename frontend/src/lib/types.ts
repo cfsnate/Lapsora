@@ -441,3 +441,28 @@ export interface PlaybackAvailabilityRange {
 	start: string;
 	end: string;
 }
+
+export interface ClipExport {
+	id: number;
+	profile_id: number;
+	file_path: string | null;
+	file_size: number | null;
+	format: string;
+	start_time: string;
+	end_time: string;
+	duration_seconds: number | null;
+	status: string;
+	error_message: string | null;
+	quality_preset: string;
+	resolution: string;
+	created_at: string;
+	completed_at: string | null;
+}
+
+export interface ClipExportCreate {
+	profile_id: number;
+	start_time: string;
+	end_time: string;
+	quality_preset?: string;
+	resolution?: string;
+}

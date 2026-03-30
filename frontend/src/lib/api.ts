@@ -1,4 +1,4 @@
-import type { Stream, StreamCreate, StreamUpdate, Profile, ProfileCreate, ProfileUpdate, ProfileTemplate, ProfileTemplateCreate, Capture, Timelapse, TimelapseGenerate, TimelapseSchedule, TimelapseScheduleCreate, TimelapseScheduleUpdate, CleanupSchedule, CleanupScheduleCreate, CleanupScheduleUpdate, TestResult, StorageStats, Notification, NotificationURL, HealthConfig, NotificationEventsConfig, LocationConfig, CaptureGapConfig, TimeFormatConfig, StatsSummary, StorageTrendPoint, CaptureActivityPoint, ProfileStoragePoint, Go2rtcConfig, Go2rtcStreamInfo, TimelapseSummary, RecordingStatus, RecordingStorageStats, PlaybackAvailabilityRange } from './types';
+import type { Stream, StreamCreate, StreamUpdate, Profile, ProfileCreate, ProfileUpdate, ProfileTemplate, ProfileTemplateCreate, Capture, Timelapse, TimelapseGenerate, TimelapseSchedule, TimelapseScheduleCreate, TimelapseScheduleUpdate, CleanupSchedule, CleanupScheduleCreate, CleanupScheduleUpdate, TestResult, StorageStats, Notification, NotificationURL, HealthConfig, NotificationEventsConfig, LocationConfig, CaptureGapConfig, TimeFormatConfig, StatsSummary, StorageTrendPoint, CaptureActivityPoint, ProfileStoragePoint, Go2rtcConfig, Go2rtcStreamInfo, TimelapseSummary, RecordingStatus, RecordingStorageStats, PlaybackAvailabilityRange, ClipExport, ClipExportCreate } from './types';
 
 const BASE = '/api';
 
@@ -167,6 +167,19 @@ export const api = {
 	getSegmentUrl: (segmentId: number) => `${BASE}/playback/segment/${segmentId}`,
 	getAvailability: (profileId: number, date: string, days = 1) =>
 		request<PlaybackAvailabilityRange[]>(`/playback/${profileId}/availability?date=${date}&days=${days}`),
+
+	// Exports
+	getExports: (status?: string) => {
+		const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+		return request<ClipExport[]>(`/exports${qs}`);
+	},
+	getExport: (id: number) => request<ClipExport>(`/exports/${id}`),
+	createExport: (data: ClipExportCreate) =>
+		request<{ status: string; id: number }>('/exports/', { method: 'POST', body: JSON.stringify(data) }),
+	getExportDownloadUrl: (id: number) => `${BASE}/exports/${id}/download`,
+	cancelExport: (id: number) =>
+		request<{ status: string }>(`/exports/${id}/cancel`, { method: 'DELETE' }),
+	deleteExport: (id: number) => request<void>(`/exports/${id}`, { method: 'DELETE' }),
 
 	// SSE helper
 	getNotificationStreamUrl: () => `${BASE}/notifications/stream`,
