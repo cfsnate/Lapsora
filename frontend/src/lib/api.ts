@@ -1,4 +1,4 @@
-import type { Stream, StreamCreate, StreamUpdate, Profile, ProfileCreate, ProfileUpdate, ProfileTemplate, ProfileTemplateCreate, Capture, Timelapse, TimelapseGenerate, TimelapseSchedule, TimelapseScheduleCreate, TimelapseScheduleUpdate, CleanupSchedule, CleanupScheduleCreate, CleanupScheduleUpdate, TestResult, StorageStats, Notification, NotificationURL, HealthConfig, NotificationEventsConfig, LocationConfig, CaptureGapConfig, TimeFormatConfig, StatsSummary, StorageTrendPoint, CaptureActivityPoint, ProfileStoragePoint, Go2rtcConfig, Go2rtcStreamInfo, TimelapseSummary, RecordingStatus, RecordingStorageStats } from './types';
+import type { Stream, StreamCreate, StreamUpdate, Profile, ProfileCreate, ProfileUpdate, ProfileTemplate, ProfileTemplateCreate, Capture, Timelapse, TimelapseGenerate, TimelapseSchedule, TimelapseScheduleCreate, TimelapseScheduleUpdate, CleanupSchedule, CleanupScheduleCreate, CleanupScheduleUpdate, TestResult, StorageStats, Notification, NotificationURL, HealthConfig, NotificationEventsConfig, LocationConfig, CaptureGapConfig, TimeFormatConfig, StatsSummary, StorageTrendPoint, CaptureActivityPoint, ProfileStoragePoint, Go2rtcConfig, Go2rtcStreamInfo, TimelapseSummary, RecordingStatus, RecordingStorageStats, PlaybackAvailabilityRange } from './types';
 
 const BASE = '/api';
 
@@ -160,6 +160,13 @@ export const api = {
 	// Recording
 	getRecordingStatuses: () => request<Record<string, RecordingStatus>>('/recording/status'),
 	getRecordingStatus: (profileId: number) => request<RecordingStatus>(`/recording/status/${profileId}`),
+
+	// Playback
+	getPlaylistUrl: (profileId: number, start: string, end: string) =>
+		`${BASE}/playback/${profileId}/playlist?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`,
+	getSegmentUrl: (segmentId: number) => `${BASE}/playback/segment/${segmentId}`,
+	getAvailability: (profileId: number, date: string, days = 1) =>
+		request<PlaybackAvailabilityRange[]>(`/playback/${profileId}/availability?date=${date}&days=${days}`),
 
 	// SSE helper
 	getNotificationStreamUrl: () => `${BASE}/notifications/stream`,

@@ -436,3 +436,8 @@ export interface RecordingStatus {
 	last_segment_at: string | null;
 	retry_count: number;
 }
+
+export interface PlaybackAvailabilityRange {
+	start: string;
+	end: string;
+}
