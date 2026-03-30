@@ -2,21 +2,23 @@
 phase: 05-clip-export
 plan: 04
 subsystem: ui
-tags: [svelte, sveltekit, export, playback, timeline, listing-page]
+tags: [svelte, sveltekit, export-ui, playback, listing-page]
 
 requires:
-  - phase: 05-clip-export (Plan 03)
-    provides: ExportDialog component, Timeline selection props, API export methods, ClipExport type
+  - phase: 05-clip-export (plan 03)
+    provides: ExportDialog component, Timeline selection props, ClipExport types, API client export methods
+
 provides:
-  - PlaybackControls with Export Clip button (hasSelection/onExportClick props)
-  - Playback page wiring of timeline selection → ExportDialog → API
-  - /exports listing page with status filtering, polling, download/cancel/delete actions
-  - Navigation link for Exports in layout sidebar
+  - Export Clip button in PlaybackControls tied to timeline selection
+  - Playback page wiring of selection → ExportDialog → API submission
+  - Dedicated /exports listing page with status filtering, polling, download/cancel/delete
+  - Navigation link for Exports in sidebar
+
 affects: [06-recording-notifications]
 
 tech-stack:
   added: []
-  patterns: [listing-page-with-polling, confirmation-modal-pattern, conditional-button-rendering]
+  patterns: [listing-page-with-polling, confirmation-modal-pattern, selection-to-dialog-wiring]
 
 key-files:
   created:
@@ -27,12 +29,12 @@ key-files:
     - frontend/src/routes/+layout.svelte
 
 key-decisions:
-  - "Polling interval 5s for active exports — matches UI-SPEC recommendation"
   - "Export Clip button positioned after speed controls with ml-auto for right-alignment"
+  - "Polling interval 5s for active exports — matches UI-SPEC recommendation"
 
 patterns-established:
-  - "Exports listing mirrors timelapses page pattern: loading/error/empty/list states with status filter"
-  - "Confirmation modals for destructive actions (delete/cancel) with specific copy per UI-SPEC"
+  - "Listing page with polling: auto-refresh via setInterval when items have active status"
+  - "Selection-to-dialog flow: Timeline shift+click → state → conditional ExportDialog rendering"
 
 requirements-completed: [EXPRT-01, EXPRT-02]
 
@@ -40,24 +42,23 @@ duration: 3min
 completed: 2026-03-30
 ---
 
-# Phase 5 Plan 4: Export UI Wiring & Listing Page Summary
+# Phase 05 Plan 04: Export UI Wiring & Listing Page Summary
 
-**Playback page wired with Export Clip button, timeline selection → ExportDialog flow, plus dedicated /exports listing page with status-filtered cards, polling, download/cancel/delete actions**
+**Playback page wired with timeline selection → ExportDialog flow, plus dedicated /exports listing page with status polling, download links, and cancel/delete modals**
 
 ## Performance
 
 - **Duration:** 3 min
-- **Started:** 2026-03-30T22:36:44Z
-- **Completed:** 2026-03-30T22:39:29Z
+- **Started:** 2026-03-30T22:41:19Z
+- **Completed:** 2026-03-30T22:44:00Z
 - **Tasks:** 2
 - **Files modified:** 4
 
 ## Accomplishments
-- PlaybackControls shows "Export Clip" button only when timeline range selected, triggering ExportDialog
-- Playback page manages selectionStart/selectionEnd state, passes to Timeline and ExportDialog, clears on submit
-- /exports page lists all clip exports with status-based card styling (pending=yellow, processing=blue, completed=default, failed=red)
-- Page polls every 5s while exports are in-progress, with download/cancel/delete action buttons and confirmation modals
-- Navigation sidebar includes Exports link between Timelapses and Files
+- PlaybackControls shows "Export Clip" button when timeline range is selected, wired to open ExportDialog
+- Playback page manages selectionStart/selectionEnd state, passes to Timeline and ExportDialog; clears selection on successful submit
+- Dedicated /exports page lists all clip exports with status-colored cards, polling every 5s for active exports, download/cancel/delete actions with confirmation modals
+- Sidebar navigation includes Exports link between Timelapses and Files
 
 ## Task Commits
 
@@ -67,21 +68,22 @@ Each task was committed atomically:
 2. **Task 2: Exports listing page + navigation link** - `b27582b` (feat)
 
 ## Files Created/Modified
-- `frontend/src/routes/exports/+page.svelte` - New exports listing page (265 lines) with filtering, polling, status cards, modals
 - `frontend/src/lib/components/PlaybackControls.svelte` - Added hasSelection/onExportClick props and Export Clip button
-- `frontend/src/routes/streams/[id]/playback/+page.svelte` - Wired selection state, ExportDialog import, handlers
-- `frontend/src/routes/+layout.svelte` - Added Exports nav item after Timelapses
+- `frontend/src/routes/streams/[id]/playback/+page.svelte` - Wired selection state, ExportDialog, and Timeline selection props
+- `frontend/src/routes/exports/+page.svelte` - Full exports listing page with filtering, polling, modals
+- `frontend/src/routes/+layout.svelte` - Added Exports nav item with download-tray icon
 
 ## Decisions Made
-- Polling interval 5s for active exports — matches UI-SPEC recommendation for responsive status updates
-- Export Clip button positioned after speed controls with `ml-auto` for right-alignment in controls bar
-- Exports page mirrors timelapses listing pattern for consistency (loading/error/empty/list states)
+- Export Clip button positioned after speed controls with ml-auto for right-alignment
+- Polling interval 5s for active exports — matches UI-SPEC recommendation
+- Exports variable named `exports_` to avoid conflict with JS reserved word
 
 ## Deviations from Plan
 
 None - plan executed exactly as written.
 
 ## Issues Encountered
+
 None
 
 ## User Setup Required
@@ -89,14 +91,11 @@ None
 None - no external service configuration required.
 
 ## Next Phase Readiness
-- Export UI flow complete end-to-end: timeline selection → dialog → API → listing page
-- Ready for Phase 6 (recording notifications) — export events can now trigger notifications
+- Full clip export flow is complete: data model → API → processing → UI wiring → listing page
+- Phase 05 (clip-export) is fully implemented and ready for verification
+- Phase 06 (recording-notifications) can proceed — may reference export events
 
 ## Self-Check: PASSED
-
-- All 4 files verified present on disk
-- Commit e5a133f verified in git log
-- Commit b27582b verified in git log
 
 ---
 *Phase: 05-clip-export*
