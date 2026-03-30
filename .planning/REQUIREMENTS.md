@@ -22,7 +22,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Playback
 
-- [ ] **PLAY-01**: User can navigate recorded history via a timeline scrubber with date/time selection
+- [x] **PLAY-01**: User can navigate recorded history via a timeline scrubber with date/time selection
 - [x] **PLAY-02**: User can see gaps in the timeline where recordings are missing
 - [x] **PLAY-03**: User can watch recorded footage with seamless cross-segment HLS playback in the browser
 - [x] **PLAY-04**: User can view live stream and recording timeline on the same page
@@ -83,7 +83,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | REC-05 | Phase 1 | Complete |
 | STOR-01 | Phase 3 | Complete |
 | STOR-02 | Phase 3 | Complete |
-| PLAY-01 | Phase 4 | Pending |
+| PLAY-01 | Phase 4 | Complete |
 | PLAY-02 | Phase 4 | Complete |
 | PLAY-03 | Phase 4 | Complete |
 | PLAY-04 | Phase 4 | Complete |
