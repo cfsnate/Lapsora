@@ -68,7 +68,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — Backend retention engine: migration, cleanup service, protection API, storage stats
+- [x] 03-01-PLAN.md — Backend retention engine: migration, cleanup service, protection API, storage stats
 - [ ] 03-02-PLAN.md — Frontend recording storage dashboard and test suite
 
 ### Phase 4: Playback Infrastructure

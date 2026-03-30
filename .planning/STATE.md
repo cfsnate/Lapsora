@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
-stopped_at: Completed 02-02-PLAN.md
-last_updated: "2026-03-30T19:26:33.726Z"
+status: executing
+stopped_at: Completed 03-01-PLAN.md
+last_updated: "2026-03-30T20:08:05.422Z"
 last_activity: 2026-03-30
 progress:
   total_phases: 7
   completed_phases: 2
-  total_plans: 5
-  completed_plans: 5
+  total_plans: 7
+  completed_plans: 6
   percent: 0
 ---
 
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-30)
 
 **Core value:** Users can record, review, and export video from their RTSP cameras without relying on cloud services or third-party NVR software.
-**Current focus:** Phase 02 — recording-engine
+**Current focus:** Phase 03 — storage-retention
 
 ## Current Position
 
-Phase: 02 (recording-engine) — EXECUTING
-Plan: 3 of 3
-Status: Phase complete — ready for verification
+Phase: 03 (storage-retention) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
 Last activity: 2026-03-30
 
 Progress: [░░░░░░░░░░] 0%
@@ -57,6 +57,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 02 P01 | 2min | 2 tasks | 1 files |
 | Phase 02 P03 | 1min | 2 tasks | 5 files |
 | Phase 02 P02 | 3min | 2 tasks | 4 files |
+| Phase 03 P01 | 3min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -78,6 +79,9 @@ Recent decisions affecting current work:
 - [Phase 02]: Recording dot placed between health dot and stream name; stream state aggregated from profiles via priority: recording > error > starting > stopped
 - [Phase 02]: Used asyncio.run_coroutine_threadsafe for thread-safe sync-to-async bridge in profile endpoints
 - [Phase 02]: Recording manager shutdown precedes APScheduler shutdown for clean FFmpeg termination
+- [Phase 03]: Batch size 500 for recording segment deletion to balance throughput and memory
+- [Phase 03]: Emergency cleanup deletes oldest unprotected segments across ALL profiles for fastest disk reclaim
+- [Phase 03]: Per-profile recording_retention_days nullable — NULL means use global default (14 days)
 
 ### Pending Todos
 
@@ -89,6 +93,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-30T19:26:33.723Z
-Stopped at: Completed 02-02-PLAN.md
+Last session: 2026-03-30T20:08:05.419Z
+Stopped at: Completed 03-01-PLAN.md
 Resume file: None

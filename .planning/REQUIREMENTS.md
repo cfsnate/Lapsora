@@ -17,8 +17,8 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Storage & Retention
 
-- [ ] **STOR-01**: User can configure rolling retention per profile with automatic cleanup of old recording segments
-- [ ] **STOR-02**: User can protect specific recording segments to exempt them from auto-cleanup
+- [x] **STOR-01**: User can configure rolling retention per profile with automatic cleanup of old recording segments
+- [x] **STOR-02**: User can protect specific recording segments to exempt them from auto-cleanup
 
 ### Playback
 
@@ -81,8 +81,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | REC-03 | Phase 2 | Complete |
 | REC-04 | Phase 2 | Complete |
 | REC-05 | Phase 1 | Complete |
-| STOR-01 | Phase 3 | Pending |
-| STOR-02 | Phase 3 | Pending |
+| STOR-01 | Phase 3 | Complete |
+| STOR-02 | Phase 3 | Complete |
 | PLAY-01 | Phase 5 | Pending |
 | PLAY-02 | Phase 5 | Pending |
 | PLAY-03 | Phase 4 | Pending |
