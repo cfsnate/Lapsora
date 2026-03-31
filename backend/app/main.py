@@ -93,6 +93,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Session middleware for Authlib OIDC state management
+from starlette.middleware.sessions import SessionMiddleware  # noqa: E402
+app.add_middleware(SessionMiddleware, secret_key=app_settings.SECRET_KEY)
+
 # API routers
 app.include_router(system.router)
 app.include_router(streams.router)

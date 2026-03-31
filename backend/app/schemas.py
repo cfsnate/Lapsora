@@ -585,5 +585,19 @@ class UserRead(BaseModel):
     email: str | None
     role: str
     is_active: bool
+    oidc_provider: str | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class OIDCConfigRead(BaseModel):
+    enabled: bool
+    provider_name: str | None = None
+    issuer_url: str | None = None
+
+
+class OIDCConfigUpdate(BaseModel):
+    issuer_url: str
+    client_id: str
+    client_secret: str
+    provider_name: str | None = None

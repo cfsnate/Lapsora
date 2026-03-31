@@ -265,6 +265,8 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
     role: Mapped[str] = mapped_column(Text, default="user", server_default="user")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    oidc_provider: Mapped[str | None] = mapped_column(Text, nullable=True)
+    oidc_subject: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(
         default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)

@@ -345,3 +345,116 @@ def test_streams_with_valid_cookie_returns_200(client: TestClient):
     resp = client.get(STREAMS_URL)
     assert resp.status_code == 200
     assert isinstance(resp.json(), list)
+
+
+# ---------------------------------------------------------------------------
+# OIDC endpoint tests
+# ---------------------------------------------------------------------------
+
+OIDC_CONFIG_URL = "/api/auth/oidc/config"
+OIDC_LOGIN_URL = "/api/auth/oidc/login"
+OIDC_CALLBACK_URL = "/api/auth/oidc/callback"
+
+VALID_OIDC_CONFIG = {
+    "issuer_url": "https://accounts.example.com",
+    "client_id": "test-client-id",
+    "client_secret": "test-client-secret",
+    "provider_name": "Example IdP",
+}
+
+
+# --- GET /oidc/config ---
+
+
+def test_oidc_config_returns_disabled_when_not_configured(client: TestClient):
+    """GET /oidc/config returns enabled=False when no OIDC settings exist."""
+    resp = client.get(OIDC_CONFIG_URL)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["enabled"] is False
+
+
+def test_oidc_config_no_auth_required(client: TestClient):
+    """GET /oidc/config is public — no cookie needed."""
+    resp = client.get(OIDC_CONFIG_URL)
+    assert resp.status_code == 200
+
+
+# --- PUT /oidc/config ---
+
+
+def test_put_oidc_config_requires_admin(client: TestClient):
+    """PUT /oidc/config with no auth returns 401."""
+    resp = client.put(OIDC_CONFIG_URL, json=VALID_OIDC_CONFIG)
+    assert resp.status_code == 401
+
+
+def test_put_oidc_config_missing_issuer_url_returns_422(client: TestClient):
+    """Empty issuer_url → 422 validation error."""
+    _setup_and_login(client)
+    payload = {k: v for k, v in VALID_OIDC_CONFIG.items() if k != "issuer_url"}
+    resp = client.put(OIDC_CONFIG_URL, json=payload)
+    assert resp.status_code == 422
+
+
+def test_put_oidc_config_missing_client_id_returns_422(client: TestClient):
+    """Missing client_id → 422 validation error."""
+    _setup_and_login(client)
+    payload = {k: v for k, v in VALID_OIDC_CONFIG.items() if k != "client_id"}
+    resp = client.put(OIDC_CONFIG_URL, json=payload)
+    assert resp.status_code == 422
+
+
+def test_put_oidc_config_saves_and_returns_enabled(client: TestClient):
+    """Admin can save OIDC config and GET returns enabled=True."""
+    _setup_and_login(client)
+    resp = client.put(OIDC_CONFIG_URL, json=VALID_OIDC_CONFIG)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["enabled"] is True
+    assert data["issuer_url"] == VALID_OIDC_CONFIG["issuer_url"]
+
+    # Verify GET now returns enabled
+    get_resp = client.get(OIDC_CONFIG_URL)
+    assert get_resp.status_code == 200
+    assert get_resp.json()["enabled"] is True
+
+
+# --- GET /oidc/login ---
+
+
+def test_oidc_login_returns_400_when_not_configured(client: TestClient):
+    """GET /oidc/login returns 400 when OIDC is not configured."""
+    resp = client.get(OIDC_LOGIN_URL, follow_redirects=False)
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "oidc_not_configured"
+
+
+# --- GET /oidc/callback ---
+
+
+def test_oidc_callback_returns_401_when_not_configured(client: TestClient):
+    """GET /oidc/callback with no OIDC config returns 401."""
+    resp = client.get(OIDC_CALLBACK_URL + "?code=fake&state=fake", follow_redirects=False)
+    assert resp.status_code == 401
+    assert resp.json()["detail"] == "oidc_callback_failed"
+
+
+def test_oidc_callback_token_exchange_failure_returns_401(client: TestClient):
+    """When Authlib authorize_access_token raises, callback returns 401."""
+    _setup_and_login(client)
+    client.put(OIDC_CONFIG_URL, json=VALID_OIDC_CONFIG)
+
+    # Patch authorize_access_token to raise
+    from unittest.mock import AsyncMock, patch
+    with patch(
+        "authlib.integrations.starlette_client.StarletteOAuth2App.authorize_access_token",
+        new_callable=AsyncMock,
+        side_effect=Exception("provider error"),
+    ):
+        resp = client.get(
+            OIDC_CALLBACK_URL + "?code=badcode&state=badstate",
+            follow_redirects=False,
+        )
+    assert resp.status_code == 401
+    assert resp.json()["detail"] == "oidc_callback_failed"
