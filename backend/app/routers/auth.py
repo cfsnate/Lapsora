@@ -13,14 +13,18 @@ from sqlalchemy.orm import Session
 from app.config import decrypt, encrypt, settings
 from app.database import get_db
 from app.dependencies import get_current_user, require_admin
-from app.models import Setting, User
+from app.models import Profile, Setting, User, UserProfileAccess
 from app.schemas import (
     LoginRequest,
     OIDCConfigRead,
     OIDCConfigUpdate,
     SetupCreate,
     SetupStatusResponse,
+    UserAdminRead,
+    UserCreate,
+    UserProfileAccessUpdate,
     UserRead,
+    UserUpdate,
 )
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -131,6 +135,197 @@ def logout(response: Response):
 def me(current_user: User = Depends(get_current_user)):
     """Return the currently authenticated user."""
     return current_user
+
+
+# ---------------------------------------------------------------------------
+# Admin user management helpers
+# ---------------------------------------------------------------------------
+
+
+def _build_admin_read(user: User, db: Session) -> UserAdminRead:
+    """Build a UserAdminRead by querying the junction table for profile IDs."""
+    rows = db.query(UserProfileAccess).filter(UserProfileAccess.user_id == user.id).all()
+    profile_ids = [row.profile_id for row in rows]
+    return UserAdminRead(
+        id=user.id,
+        username=user.username,
+        display_name=user.display_name,
+        email=user.email,
+        role=user.role,
+        is_active=user.is_active,
+        oidc_provider=user.oidc_provider,
+        created_at=user.created_at,
+        updated_at=user.updated_at,
+        accessible_profile_ids=profile_ids,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Admin user CRUD endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.get("/users", response_model=list[UserAdminRead])
+def list_users(
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """List all users with their accessible profile IDs (admin-only)."""
+    users = db.query(User).all()
+    return [_build_admin_read(u, db) for u in users]
+
+
+@router.post("/users", response_model=UserAdminRead, status_code=201)
+def create_user(
+    payload: UserCreate,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Create a new user (admin-only). Returns 409 if username already exists."""
+    if db.query(User).filter(User.username == payload.username).first():
+        raise HTTPException(status_code=409, detail="username_taken")
+
+    if payload.role not in ("admin", "user"):
+        raise HTTPException(status_code=400, detail="invalid_role")
+
+    password_hash = bcrypt.hashpw(
+        payload.password.encode("utf-8"), bcrypt.gensalt()
+    ).decode("utf-8")
+
+    user = User(
+        username=payload.username,
+        display_name=payload.display_name,
+        email=payload.email,
+        password_hash=password_hash,
+        role=payload.role,
+        is_active=payload.is_active,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return _build_admin_read(user, db)
+
+
+@router.get("/users/{user_id}", response_model=UserAdminRead)
+def get_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Get a single user by ID (admin-only)."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="user_not_found")
+    return _build_admin_read(user, db)
+
+
+@router.put("/users/{user_id}", response_model=UserAdminRead)
+def update_user(
+    user_id: int,
+    payload: UserUpdate,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Update a user (admin-only). Hashes password if provided."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="user_not_found")
+
+    if payload.role is not None and payload.role not in ("admin", "user"):
+        raise HTTPException(status_code=400, detail="invalid_role")
+
+    if payload.display_name is not None:
+        user.display_name = payload.display_name
+    if payload.email is not None:
+        user.email = payload.email
+    if payload.role is not None:
+        user.role = payload.role
+    if payload.is_active is not None:
+        user.is_active = payload.is_active
+    if payload.password is not None:
+        user.password_hash = bcrypt.hashpw(
+            payload.password.encode("utf-8"), bcrypt.gensalt()
+        ).decode("utf-8")
+
+    db.commit()
+    db.refresh(user)
+    return _build_admin_read(user, db)
+
+
+@router.delete("/users/{user_id}", response_model=UserAdminRead)
+def disable_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    """Disable a user (set is_active=False). Admins cannot disable themselves."""
+    if admin.id == user_id:
+        raise HTTPException(status_code=400, detail="cannot_disable_self")
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="user_not_found")
+
+    user.is_active = False
+    db.commit()
+    db.refresh(user)
+    return _build_admin_read(user, db)
+
+
+# ---------------------------------------------------------------------------
+# Profile access management endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.get("/users/{user_id}/profiles")
+def get_user_profiles(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Get profile IDs the user can access (admin-only)."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="user_not_found")
+
+    rows = db.query(UserProfileAccess).filter(UserProfileAccess.user_id == user_id).all()
+    return {"profile_ids": [row.profile_id for row in rows]}
+
+
+@router.put("/users/{user_id}/profiles")
+def set_user_profiles(
+    user_id: int,
+    payload: UserProfileAccessUpdate,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Set profile access for a user. Replaces all existing rows (admin-only)."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="user_not_found")
+
+    # Validate all profile IDs exist
+    if payload.profile_ids:
+        existing_ids = {
+            row.id
+            for row in db.query(Profile.id)
+            .filter(Profile.id.in_(payload.profile_ids))
+            .all()
+        }
+        missing = set(payload.profile_ids) - existing_ids
+        if missing:
+            raise HTTPException(
+                status_code=400,
+                detail=f"profile_ids_not_found: {sorted(missing)}",
+            )
+
+    # Replace access rows
+    db.query(UserProfileAccess).filter(UserProfileAccess.user_id == user_id).delete()
+    for profile_id in payload.profile_ids:
+        db.add(UserProfileAccess(user_id=user_id, profile_id=profile_id))
+    db.commit()
+
+    return {"profile_ids": payload.profile_ids}
 
 
 # ---------------------------------------------------------------------------
