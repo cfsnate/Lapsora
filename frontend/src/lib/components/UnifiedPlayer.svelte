@@ -133,10 +133,10 @@
 				const instance = new Hls({
 					// For live HLS, be patient: the stream may take a few seconds to start
 					manifestLoadingMaxRetry: isLiveHls ? 10 : 2,
-					manifestLoadingRetryDelay: isLiveHls ? 1000 : 500,
-					manifestLoadingMaxRetryTimeout: isLiveHls ? 4000 : 2000,
-					levelLoadingMaxRetry: isLiveHls ? 10 : 2,
-					levelLoadingRetryDelay: isLiveHls ? 1000 : 500,
+					manifestLoadingRetryDelay: isLiveHls ? 500 : 500,
+					manifestLoadingMaxRetryTimeout: isLiveHls ? 2000 : 2000,
+					levelLoadingMaxRetry: isLiveHls ? 6 : 2,
+					levelLoadingRetryDelay: isLiveHls ? 500 : 500,
 					// Keep a modest buffer — live view doesn't need 30s
 					maxBufferLength: isLiveHls ? 8 : 30,
 					maxMaxBufferLength: isLiveHls ? 16 : 60,
@@ -156,6 +156,8 @@
 						errorMsg = data.details || 'HLS playback failed';
 						onError?.(data.details || 'HLS playback failed');
 					}
+					// Non-fatal network errors during live HLS startup are expected —
+					// HLS.js will retry automatically, no action needed
 				});
 				hlsInstance = instance;
 

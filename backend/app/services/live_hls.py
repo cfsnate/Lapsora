@@ -112,35 +112,43 @@ class LiveHLSManager:
         return session
 
     async def _watch_session(self, session: LiveSession) -> None:
-        """Poll for the playlist file and log FFmpeg stderr."""
+        """Poll for the first usable segment then signal ready."""
         process = session.process
         assert process is not None
 
-        # Poll until playlist appears or process dies
+        # Poll until we have a playlist with at least one segment file that exists on disk
         while not session.ready:
-            if os.path.exists(os.path.join(session.output_dir, "playlist.m3u8")):
-                # Check the playlist has at least one segment line
+            playlist_path = os.path.join(session.output_dir, "playlist.m3u8")
+            if os.path.exists(playlist_path):
                 try:
-                    with open(os.path.join(session.output_dir, "playlist.m3u8")) as f:
-                        if any(line.strip().endswith(".ts") for line in f):
+                    with open(playlist_path) as f:
+                        lines = f.readlines()
+                    ts_files = [l.strip() for l in lines if l.strip().endswith(".ts")]
+                    if ts_files:
+                        # Verify at least one segment file actually exists and has content
+                        seg_path = os.path.join(session.output_dir, ts_files[-1])
+                        if os.path.exists(seg_path) and os.path.getsize(seg_path) > 0:
                             session.ready = True
                             session._ready_event.set()
-                            logger.info("Live HLS stream %d is ready", session.stream_id)
+                            logger.info("Live HLS stream %d is ready (%d segments visible)",
+                                        session.stream_id, len(ts_files))
                             break
                 except OSError:
                     pass
             if process.returncode is not None:
+                logger.error("Live HLS FFmpeg exited before stream became ready (stream %d)",
+                             session.stream_id)
                 break
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.25)
 
-        # Drain stderr for diagnostics
+        # Drain stderr for diagnostics without blocking indefinitely
         if process.stderr:
             try:
-                stderr = await process.stderr.read()
+                stderr = await asyncio.wait_for(process.stderr.read(), timeout=2.0)
                 if stderr.strip():
                     logger.error("Live HLS FFmpeg stderr (stream %d): %s", session.stream_id,
                                  stderr.decode("utf-8", errors="replace").strip())
-            except Exception:
+            except (asyncio.TimeoutError, Exception):
                 pass
 
     async def stop(self, stream_id: int) -> None:

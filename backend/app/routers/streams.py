@@ -168,7 +168,7 @@ async def get_live_url(stream_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{stream_id}/live-hls/{filename}")
-async def serve_live_hls(stream_id: int, filename: str, db: Session = Depends(get_db)):
+async def serve_live_hls(stream_id: int, filename: str):
     """Serve live HLS playlist and segment files."""
     import os
     if ".." in filename or "/" in filename:
@@ -181,7 +181,25 @@ async def serve_live_hls(stream_id: int, filename: str, db: Session = Depends(ge
         raise HTTPException(404, "File not found")
 
     if filename.endswith(".m3u8"):
-        return FileResponse(file_path, media_type="application/vnd.apple.mpegurl")
+        # Read and return as bytes so we snapshot the file at request time
+        # (FFmpeg is actively writing it). No-cache so HLS.js always polls fresh.
+        try:
+            with open(file_path, "rb") as f:
+                content = f.read()
+        except OSError:
+            raise HTTPException(404, "File not found")
+        return Response(
+            content=content,
+            media_type="application/vnd.apple.mpegurl",
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+            },
+        )
     elif filename.endswith(".ts"):
-        return FileResponse(file_path, media_type="video/mp2t")
+        return FileResponse(
+            file_path,
+            media_type="video/mp2t",
+            headers={"Cache-Control": "public, max-age=3600"},
+        )
     raise HTTPException(400, "Unknown file type")
