@@ -21,6 +21,10 @@
 	let editError = $state<string | null>(null);
 	let saving = $state(false);
 
+	// Delete confirmation
+	let deleteGroupId = $state<number | null>(null);
+	let deleting = $state(false);
+
 	// Profile access modal
 	let profileAccessGroupId = $state<number | null>(null);
 	let profilePerms = $state<Map<number, ProfilePermission>>(new Map());
@@ -101,12 +105,17 @@
 	}
 
 	// ── Delete ───────────────────────────────────────────────────────────────
-	async function handleDelete(groupId: number) {
+	async function confirmDelete() {
+		if (deleteGroupId === null) return;
+		deleting = true;
 		try {
-			await api.deleteGroup(groupId);
-			groups = groups.filter((g) => g.id !== groupId);
+			await api.deleteGroup(deleteGroupId);
+			groups = groups.filter((g) => g.id !== deleteGroupId);
 		} catch (err) {
 			console.error('Failed to delete group:', err);
+		} finally {
+			deleting = false;
+			deleteGroupId = null;
 		}
 	}
 
@@ -305,7 +314,7 @@
 										<button onclick={() => startEdit(group)} class="mr-1 text-blue-400 hover:text-blue-300 text-xs">Edit</button>
 										<button onclick={() => openProfileAccess(group)} class="mr-1 text-yellow-400 hover:text-yellow-300 text-xs">Profiles</button>
 										<button onclick={() => openMappings(group)} class="mr-1 text-cyan-400 hover:text-cyan-300 text-xs">Mappings</button>
-										<button onclick={() => handleDelete(group.id)} class="text-red-400 hover:text-red-300 text-xs">Delete</button>
+										<button onclick={() => (deleteGroupId = group.id)} class="text-red-400 hover:text-red-300 text-xs">Delete</button>
 									</td>
 								{/if}
 							</tr>
@@ -414,6 +423,39 @@
 				<button onclick={saveMappings} disabled={savingMappings}
 					class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50">
 					{savingMappings ? 'Saving...' : 'Save Mappings'}
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Delete Group Confirmation Modal -->
+{#if deleteGroupId !== null}
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onclick={() => { if (!deleting) deleteGroupId = null; }} onkeydown={() => {}}>
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="mx-4 w-full max-w-sm rounded-xl bg-gray-900 p-6 shadow-xl" onclick={(e) => e.stopPropagation()} onkeydown={() => {}}>
+			<h3 class="mb-2 text-lg font-semibold text-red-400">Delete Group</h3>
+			<p class="mb-2 text-sm text-gray-300">
+				Are you sure you want to delete <strong class="text-white">{groups.find((g) => g.id === deleteGroupId)?.name}</strong>?
+			</p>
+			<p class="mb-4 text-sm text-gray-400">
+				This will remove the group's profile access and OIDC mappings. Users in this group will lose any permissions granted through it.
+			</p>
+			<div class="flex justify-end gap-3">
+				<button
+					onclick={() => { deleteGroupId = null; }}
+					disabled={deleting}
+					class="rounded-lg border border-gray-700 px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 disabled:opacity-50"
+				>
+					Cancel
+				</button>
+				<button
+					onclick={confirmDelete}
+					disabled={deleting}
+					class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-50"
+				>
+					{deleting ? 'Deleting...' : 'Delete Group'}
 				</button>
 			</div>
 		</div>
