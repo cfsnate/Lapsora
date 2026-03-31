@@ -6,6 +6,10 @@ import unittest
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
 from app.services.events import emit
 from app.services.notifications import handle_event, DEFAULT_EVENT_TOGGLES, _get_event_toggles
 from app.services.recording import RecordingProcess, RecordingManager
