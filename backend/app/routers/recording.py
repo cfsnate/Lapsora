@@ -149,3 +149,46 @@ async def verify_segments(profile_id: int, db: Session = Depends(get_db)):
         "missing_files": missing_files,
         "segments": results,
     }
+
+
+@router.delete("/all", status_code=200)
+async def delete_all_recordings(db: Session = Depends(get_db)):
+    """Delete ALL recording segments from database and disk. Destructive and irreversible.
+    
+    Stops all active recording processes, deletes all segment files,
+    removes DB records, and restarts recording for enabled profiles.
+    """
+    import os
+    import shutil
+    from app.config import settings
+    from app.services.recording import recording_manager
+
+    # 1. Stop all active recordings
+    await recording_manager.stop_all()
+
+    # 2. Delete all segment records from DB
+    count = db.query(RecordingSegment).delete()
+    db.commit()
+
+    # 3. Remove recordings directory from disk
+    recordings_dir = os.path.join(settings.DATA_DIR, "recordings")
+    removed_bytes = 0
+    if os.path.isdir(recordings_dir):
+        for root, dirs, files in os.walk(recordings_dir):
+            for f in files:
+                try:
+                    fpath = os.path.join(root, f)
+                    removed_bytes += os.path.getsize(fpath)
+                except OSError:
+                    pass
+        shutil.rmtree(recordings_dir, ignore_errors=True)
+        os.makedirs(recordings_dir, exist_ok=True)
+
+    # 4. Restart recordings for enabled profiles
+    await recording_manager.start_all()
+
+    return {
+        "status": "ok",
+        "segments_deleted": count,
+        "bytes_freed": removed_bytes,
+    }

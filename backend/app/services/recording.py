@@ -410,6 +410,23 @@ class RecordingManager:
             await self._processes[profile_id]._stop_ffmpeg()
             del self._processes[profile_id]
 
+    async def stop_all(self) -> None:
+        """Stop all active recording processes."""
+        for pid in list(self._processes.keys()):
+            await self.stop(pid)
+
+    async def start_all(self) -> None:
+        """Start recording for all enabled profiles."""
+        db = SessionLocal()
+        try:
+            profiles = db.query(Profile).filter(
+                Profile.recording_enabled.is_(True)
+            ).all()
+            for p in profiles:
+                await self.start(p.id)
+        finally:
+            db.close()
+
     async def restart(self, profile_id: int) -> None:
         await self.stop(profile_id)
         await self.start(profile_id)
