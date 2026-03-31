@@ -20,6 +20,7 @@
 	let currentTime = $state<Date | null>(null);
 	let playing = $state(false);
 	let hlsSrc = $state('');
+	let seekTarget = $state<Date | null>(null);
 	let liveWsUrl = $state<string | null>(null);
 	let liveHlsSrc = $state<string | null>(null);
 	// Separate tracking for the playback window so hlsSrc mutations don't re-trigger effects
@@ -85,6 +86,7 @@
 	function handleSeek(time: Date) {
 		if (!selectedProfileId) return;
 		mode = 'recording';
+		seekTarget = time;
 		const start = new Date(time.getTime() - 30 * 60 * 1000);
 		const end = new Date(time.getTime() + 30 * 60 * 1000);
 		playbackWindowStart = start;
@@ -220,6 +222,7 @@
 				wsUrl={liveWsUrl ?? undefined}
 				hlsSrc={mode === 'live' ? (liveHlsSrc ?? undefined) : (hlsSrc || undefined)}
 				{playbackRate}
+				seekTo={mode === 'recording' ? seekTarget : null}
 				onTimeUpdate={handleTimeUpdate}
 				onError={(msg) => console.error('Player error:', msg)}
 				onReady={() => { playing = true; }}

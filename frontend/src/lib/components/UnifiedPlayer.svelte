@@ -6,12 +6,13 @@
 		wsUrl?: string;
 		hlsSrc?: string;
 		playbackRate?: number;
+		seekTo?: Date | null;
 		onTimeUpdate?: (time: Date | null) => void;
 		onError?: (msg: string) => void;
 		onReady?: () => void;
 	}
 
-	let { mode, wsUrl, hlsSrc, playbackRate = 1, onTimeUpdate, onError, onReady }: Props = $props();
+	let { mode, wsUrl, hlsSrc, playbackRate = 1, seekTo = null, onTimeUpdate, onError, onReady }: Props = $props();
 
 	let videoEl = $state<HTMLVideoElement | null>(null);
 	let hlsInstance: Hls | null = null;
@@ -168,6 +169,35 @@
 					}
 					status = 'ready';
 					onReady?.();
+
+					// Seek to the requested time within the playlist.
+					// HLS.js uses EXT-X-PROGRAM-DATE-TIME to map real-time → media time.
+					if (seekTo && !isLiveHls && videoEl) {
+						const details = instance.levels[0]?.details;
+						if (details?.fragments?.length) {
+							const seekMs = seekTo.getTime();
+							// Find the fragment closest to the seek target
+							for (const frag of details.fragments) {
+								if (frag.programDateTime) {
+									const fragStartMs = frag.programDateTime;
+									const fragEndMs = fragStartMs + frag.duration * 1000;
+									if (seekMs >= fragStartMs && seekMs < fragEndMs) {
+										const offsetInFrag = (seekMs - fragStartMs) / 1000;
+										videoEl.currentTime = frag.start + offsetInFrag;
+										break;
+									}
+								}
+							}
+							// If seekTo is before all fragments, just start at the beginning
+							// If after all fragments, seek to near the end
+							if (videoEl.currentTime === 0 && details.fragments.length > 0) {
+								const lastFrag = details.fragments[details.fragments.length - 1];
+								if (lastFrag.programDateTime && seekMs > lastFrag.programDateTime) {
+									videoEl.currentTime = lastFrag.start;
+								}
+							}
+						}
+					}
 				});
 				instance.on(Hls.Events.FRAG_LOADED, () => {
 					// First fragment loaded — ensure playing state is set
