@@ -249,9 +249,33 @@
 			videoEl.playbackRate = playbackRate;
 		}
 	});
+
+	let containerEl = $state<HTMLDivElement | null>(null);
+	let isFullscreen = $state(false);
+
+	function toggleFullscreen() {
+		if (!containerEl) return;
+		if (document.fullscreenElement) {
+			document.exitFullscreen();
+		} else {
+			containerEl.requestFullscreen().catch(() => {});
+		}
+	}
+
+	$effect(() => {
+		function onFsChange() {
+			isFullscreen = !!document.fullscreenElement;
+		}
+		document.addEventListener('fullscreenchange', onFsChange);
+		return () => document.removeEventListener('fullscreenchange', onFsChange);
+	});
 </script>
 
-<div class="relative aspect-video w-full overflow-hidden rounded-lg bg-black">
+<div
+	bind:this={containerEl}
+	class="relative aspect-video w-full overflow-hidden rounded-lg bg-black group"
+	ondblclick={toggleFullscreen}
+>
 	<!-- svelte-ignore a11y_media_has_caption -->
 	<video
 		bind:this={videoEl}
@@ -266,6 +290,28 @@
 		}}
 		onplay={() => { status = 'playing'; }}
 	></video>
+
+	<!-- Fullscreen toggle button -->
+	{#if status === 'playing' || status === 'ready'}
+		<button
+			onclick={toggleFullscreen}
+			class="absolute bottom-3 right-3 rounded-md bg-black/60 p-2 text-gray-300 opacity-0 transition-opacity hover:text-white group-hover:opacity-100"
+			aria-label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+		>
+			{#if isFullscreen}
+				<!-- Exit fullscreen icon -->
+				<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M9 9V4H4m0 0v5m5-5L4 9m11-5v5h5m0-5h-5m5 5l-5-5M9 15v5H4m0 0v-5m5 5l-5-5m16 0v5h-5m5 0h-5m5-5l-5 5" />
+				</svg>
+			{:else}
+				<!-- Fullscreen icon -->
+				<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4h4M4 16v4h4M16 4h4v4M16 20h4v-4" />
+				</svg>
+			{/if}
+		</button>
+	{/if}
+
 	{#if status === 'connecting'}
 		<div class="absolute inset-0 flex items-center justify-center">
 			<p class="text-sm text-gray-400">Connecting to live stream...</p>
