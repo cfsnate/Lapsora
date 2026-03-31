@@ -5,6 +5,8 @@ services:
       dockerfile: docker/Dockerfile
     ports:
       - "8000:8000"
+      - "443:443"
+      - "80:80"
     volumes:
       - ../data:/app/data
       - /etc/localtime:/etc/localtime:ro
