@@ -12,13 +12,13 @@
 
 	let containerEl = $state<HTMLDivElement | null>(null);
 	let containerWidth = $state(800);
-	let viewStart = $state<Date>(new Date(Date.now() - 24 * 60 * 60 * 1000));
+	let viewStart = $state<Date>(new Date(Date.now() - 60 * 60 * 1000));
 	let viewEnd = $state<Date>(new Date());
 	let hoverX = $state<number | null>(null);
 	let isDragging = $state(false);
 	let dragStartX = $state(0);
 	let dragStartView = $state<{ start: number; end: number }>({ start: 0, end: 0 });
-	let activeZoom = $state('24h');
+	let activeZoom = $state('1h');
 	let selectedDate = $state(new Date().toISOString().slice(0, 16));
 
 	const zoomPresets = [
