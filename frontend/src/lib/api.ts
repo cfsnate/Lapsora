@@ -1,4 +1,4 @@
-import type { Stream, StreamCreate, StreamUpdate, Profile, ProfileCreate, ProfileUpdate, ProfileTemplate, ProfileTemplateCreate, Capture, Timelapse, TimelapseGenerate, TimelapseSchedule, TimelapseScheduleCreate, TimelapseScheduleUpdate, CleanupSchedule, CleanupScheduleCreate, CleanupScheduleUpdate, TestResult, StorageStats, Notification, NotificationURL, HealthConfig, NotificationEventsConfig, LocationConfig, CaptureGapConfig, TimeFormatConfig, StatsSummary, StorageTrendPoint, CaptureActivityPoint, ProfileStoragePoint, Go2rtcConfig, Go2rtcStreamInfo, TimelapseSummary, RecordingStatus, RecordingStorageStats, RecordingRetentionConfig, PlaybackAvailabilityRange, ClipExport, ClipExportCreate, SetupStatus, SetupCreate, AuthUser, LoginCredentials } from './types';
+import type { Stream, StreamCreate, StreamUpdate, Profile, ProfileCreate, ProfileUpdate, ProfileTemplate, ProfileTemplateCreate, Capture, Timelapse, TimelapseGenerate, TimelapseSchedule, TimelapseScheduleCreate, TimelapseScheduleUpdate, CleanupSchedule, CleanupScheduleCreate, CleanupScheduleUpdate, TestResult, StorageStats, Notification, NotificationURL, HealthConfig, NotificationEventsConfig, LocationConfig, CaptureGapConfig, TimeFormatConfig, StatsSummary, StorageTrendPoint, CaptureActivityPoint, ProfileStoragePoint, Go2rtcConfig, Go2rtcStreamInfo, TimelapseSummary, RecordingStatus, RecordingStorageStats, RecordingRetentionConfig, PlaybackAvailabilityRange, ClipExport, ClipExportCreate, SetupStatus, SetupCreate, AuthUser, LoginCredentials, OIDCConfig, OIDCConfigUpdate } from './types';
 
 const BASE = '/api';
 
@@ -197,4 +197,9 @@ export const api = {
 	login: (data: LoginCredentials) => request<AuthUser>('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
 	logout: () => request<{ status: string }>('/auth/logout', { method: 'POST' }),
 	getMe: () => request<AuthUser>('/auth/me'),
+
+	// OIDC
+	getOIDCConfig: () => request<OIDCConfig>('/auth/oidc/config'),
+	saveOIDCConfig: (data: OIDCConfigUpdate) => request<OIDCConfig>('/auth/oidc/config', { method: 'PUT', body: JSON.stringify(data) }),
+	oidcLoginUrl: `${BASE}/auth/oidc/login`,
 };

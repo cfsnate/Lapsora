@@ -1,11 +1,21 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { api } from '$lib/api';
+	import type { OIDCConfig } from '$lib/types';
 
 	let username = $state('');
 	let password = $state('');
 	let submitting = $state(false);
 	let error = $state('');
+	let oidcConfig = $state<OIDCConfig | null>(null);
+
+	$effect(() => {
+		api.getOIDCConfig().then((cfg) => {
+			oidcConfig = cfg;
+		}).catch(() => {
+			// OIDC not configured — silently ignore
+		});
+	});
 
 	async function handleSubmit(e: SubmitEvent) {
 		e.preventDefault();
@@ -75,6 +85,27 @@
 					{submitting ? 'Signing in…' : 'Sign In'}
 				</button>
 			</form>
+
+			{#if oidcConfig?.enabled}
+				<div class="mt-6">
+					<div class="relative">
+						<div class="absolute inset-0 flex items-center">
+							<div class="w-full border-t border-gray-700"></div>
+						</div>
+						<div class="relative flex justify-center text-sm">
+							<span class="bg-gray-900 px-3 text-gray-500">or</span>
+						</div>
+					</div>
+					<div class="mt-4">
+						<a
+							href={api.oidcLoginUrl}
+							class="flex w-full items-center justify-center rounded-lg border border-gray-700 bg-gray-800 px-4 py-2.5 text-sm font-semibold text-gray-200 transition-colors hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
+						>
+							Login with {oidcConfig.provider_name || 'OIDC'}
+						</a>
+					</div>
+				</div>
+			{/if}
 		</div>
 	</div>
 </div>

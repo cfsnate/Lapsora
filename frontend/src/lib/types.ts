@@ -503,6 +503,20 @@ export interface AuthUser {
 	is_active: boolean;
 	created_at: string;
 	updated_at: string;
+	oidc_provider: string | null;
+}
+
+export interface OIDCConfig {
+	enabled: boolean;
+	provider_name: string | null;
+	issuer_url: string | null;
+}
+
+export interface OIDCConfigUpdate {
+	issuer_url: string;
+	client_id: string;
+	client_secret: string;
+	provider_name?: string;
 }
 
 export interface LoginCredentials {

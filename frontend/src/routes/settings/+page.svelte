@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { api } from '$lib/api';
 	import { setUse24h } from '$lib/utils';
-	import type { NotificationURL, NotificationEventsConfig, HealthConfig, LocationConfig, CaptureGapConfig, Go2rtcConfig, TimeFormatConfig } from '$lib/types';
+	import type { NotificationURL, NotificationEventsConfig, HealthConfig, LocationConfig, CaptureGapConfig, Go2rtcConfig, TimeFormatConfig, OIDCConfig, OIDCConfigUpdate } from '$lib/types';
 	import CleanupScheduleManager from '$lib/components/CleanupScheduleManager.svelte';
 
 	let urls = $state<NotificationURL[]>([]);
@@ -47,6 +47,12 @@
 	let deletingAllRecordings = $state(false);
 	let deleteRecordingsResult = $state<string | null>(null);
 
+	// OIDC config state
+	let oidcConfig = $state<OIDCConfig | null>(null);
+	let oidcForm = $state<OIDCConfigUpdate>({ issuer_url: '', client_id: '', client_secret: '', provider_name: '' });
+	let savingOIDC = $state(false);
+	let oidcSaveResult = $state<{ ok: boolean; message: string } | null>(null);
+
 	let loading = $state(true);
 	let newLabel = $state('');
 	let newUrl = $state('');
@@ -70,6 +76,17 @@
 			.finally(() => {
 				loading = false;
 			});
+		api.getOIDCConfig().then((cfg) => {
+			oidcConfig = cfg;
+			oidcForm = {
+				issuer_url: cfg.issuer_url ?? '',
+				client_id: '',
+				client_secret: '',
+				provider_name: cfg.provider_name ?? ''
+			};
+		}).catch(() => {
+			// OIDC not yet configured
+		});
 	});
 
 	async function addUrl() {
@@ -203,6 +220,20 @@
 			deleteRecordingsResult = `Error: ${err instanceof Error ? err.message : 'Failed to delete recordings'}`;
 		} finally {
 			deletingAllRecordings = false;
+		}
+	}
+
+	async function saveOIDCConfig() {
+		savingOIDC = true;
+		oidcSaveResult = null;
+		try {
+			const updated = await api.saveOIDCConfig(oidcForm);
+			oidcConfig = updated;
+			oidcSaveResult = { ok: true, message: 'OIDC configuration saved.' };
+		} catch (err) {
+			oidcSaveResult = { ok: false, message: err instanceof Error ? err.message : 'Failed to save OIDC configuration.' };
+		} finally {
+			savingOIDC = false;
 		}
 	}
 
@@ -549,6 +580,71 @@
 					Configure per-profile cleanup schedules to automatically remove old snapshots and timelapses.
 				</p>
 				<CleanupScheduleManager />
+			</div>
+
+			<!-- OIDC / SSO -->
+			<div class="rounded-xl border border-gray-800 bg-gray-900 p-6">
+				<h3 class="mb-1 text-lg font-medium text-white">OIDC / SSO</h3>
+				<p class="mb-4 text-sm text-gray-400">
+					Configure an OpenID Connect provider to enable single sign-on. Users who log in via OIDC are auto-provisioned if they don't have an account.
+				</p>
+				{#if oidcConfig?.enabled}
+					<div class="mb-4 rounded-lg border border-green-800 bg-green-900/20 px-3 py-2 text-sm text-green-300">
+						OIDC is currently <strong>enabled</strong> with provider "{oidcConfig.provider_name || oidcConfig.issuer_url}".
+					</div>
+				{/if}
+				<form onsubmit={(e) => { e.preventDefault(); saveOIDCConfig(); }} class="space-y-4">
+					<div>
+						<label for="oidc-issuer-url" class="mb-1 block text-sm font-medium text-gray-300">Issuer URL</label>
+						<input
+							id="oidc-issuer-url"
+							type="url"
+							bind:value={oidcForm.issuer_url}
+							placeholder="https://accounts.example.com"
+							class="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+						/>
+					</div>
+					<div>
+						<label for="oidc-client-id" class="mb-1 block text-sm font-medium text-gray-300">Client ID</label>
+						<input
+							id="oidc-client-id"
+							type="text"
+							bind:value={oidcForm.client_id}
+							placeholder="your-client-id"
+							class="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+						/>
+					</div>
+					<div>
+						<label for="oidc-client-secret" class="mb-1 block text-sm font-medium text-gray-300">Client Secret</label>
+						<input
+							id="oidc-client-secret"
+							type="password"
+							bind:value={oidcForm.client_secret}
+							placeholder="Leave blank to keep existing secret"
+							class="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+						/>
+					</div>
+					<div>
+						<label for="oidc-provider-name" class="mb-1 block text-sm font-medium text-gray-300">Provider Name <span class="text-gray-500">(optional)</span></label>
+						<input
+							id="oidc-provider-name"
+							type="text"
+							bind:value={oidcForm.provider_name}
+							placeholder="Google, Okta, Keycloak…"
+							class="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+						/>
+					</div>
+					{#if oidcSaveResult}
+						<p class="text-sm {oidcSaveResult.ok ? 'text-green-400' : 'text-red-400'}">{oidcSaveResult.message}</p>
+					{/if}
+					<button
+						type="submit"
+						disabled={savingOIDC}
+						class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:opacity-50"
+					>
+						{savingOIDC ? 'Saving...' : 'Save OIDC Configuration'}
+					</button>
+				</form>
 			</div>
 		</section>
 	{/if}
