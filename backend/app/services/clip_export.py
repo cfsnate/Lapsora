@@ -10,6 +10,7 @@ from datetime import UTC, datetime, timedelta
 from app.config import settings
 from app.database import SessionLocal
 from app.models import ClipExport, RecordingSegment
+from app.services.events import emit
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +58,15 @@ async def process_clip_export(
             export.status = "failed"
             export.error_message = "No recording segments found for the requested time range"
             db.commit()
+            
+            # Emit failure event for missing segments
+            await emit(
+                "clip_export_failed",
+                f"Clip Export Failed",
+                f"Clip export {export.id} failed: No recording segments found for the requested time range",
+                "error",
+                {"profile_id": export.profile_id, "export_id": export.id}
+            )
             return
 
         export_dir = os.path.join(
@@ -128,9 +138,27 @@ async def process_clip_export(
             export.duration_seconds = duration
             export.status = "completed"
             export.completed_at = datetime.now(UTC)
+            
+            # Emit completion event
+            await emit(
+                "clip_export_complete",
+                f"Clip Export Complete",
+                f"Clip export {export.id} completed successfully. Duration: {duration:.1f}s, Quality: {export.quality_preset}",
+                "info",
+                {"profile_id": export.profile_id, "export_id": export.id}
+            )
         else:
             export.status = "failed"
             export.error_message = stderr.decode(errors="replace")[:1000]
+            
+            # Emit failure event
+            await emit(
+                "clip_export_failed",
+                f"Clip Export Failed",
+                f"Clip export {export.id} failed: {export.error_message}",
+                "error",
+                {"profile_id": export.profile_id, "export_id": export.id}
+            )
 
         db.commit()
 
@@ -148,6 +176,15 @@ async def process_clip_export(
                 export.status = "failed"
                 export.error_message = "Unexpected processing error"
                 db.commit()
+                
+                # Emit failure event for unexpected error
+                await emit(
+                    "clip_export_failed",
+                    f"Clip Export Failed",
+                    f"Clip export {export.id} failed unexpectedly",
+                    "error",
+                    {"profile_id": export.profile_id, "export_id": export.id}
+                )
         except Exception:
             logger.exception("Failed to update export status after error")
     finally:

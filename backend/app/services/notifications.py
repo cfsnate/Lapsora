@@ -33,6 +33,7 @@ DEFAULT_EVENT_TOGGLES = {
     "recording_stopped": True,
     "recording_failed": True,
     "clip_export_complete": True,
+    "clip_export_failed": True,
 }
 
 
