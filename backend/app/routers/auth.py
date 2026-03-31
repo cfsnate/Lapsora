@@ -552,6 +552,67 @@ def _get_oidc_client(db: Session) -> tuple[OAuth, str]:
     return oauth, provider_name
 
 
+def _sync_user_groups(db: Session, user: User, userinfo: dict) -> None:
+    """Sync a user's role and profile access based on OIDC group claims.
+
+    Reads the groups_claim setting (default 'groups'), extracts matching OIDC group
+    names from userinfo, resolves them to Lapsora Group objects, and overwrites
+    the user's role and UserProfileAccess rows accordingly.
+    """
+    groups_claim_row = db.query(Setting).filter(Setting.key == "oidc_groups_claim").first()
+    groups_claim = groups_claim_row.value if groups_claim_row else "groups"
+
+    oidc_groups = userinfo.get(groups_claim, [])
+    if not isinstance(oidc_groups, list):
+        logger.warning("OIDC groups claim '%s' is not a list: %r", groups_claim, oidc_groups)
+        return
+
+    if not oidc_groups:
+        return
+
+    # Find matching Lapsora groups via OIDCGroupMapping
+    mappings = (
+        db.query(OIDCGroupMapping)
+        .filter(OIDCGroupMapping.oidc_group_name.in_(oidc_groups))
+        .all()
+    )
+    if not mappings:
+        return
+
+    matched_group_ids = [m.group_id for m in mappings]
+    matched_groups = db.query(Group).filter(Group.id.in_(matched_group_ids)).all()
+
+    if not matched_groups:
+        return
+
+    # Compute effective role: admin if any group is admin, else user
+    effective_role = "user"
+    for g in matched_groups:
+        if g.role == "admin":
+            effective_role = "admin"
+            break
+
+    user.role = effective_role
+
+    # Compute effective profile access: union of all matched groups' profile IDs
+    all_profile_ids: set[int] = set()
+    for g in matched_groups:
+        gpa_rows = db.query(GroupProfileAccess).filter(GroupProfileAccess.group_id == g.id).all()
+        for row in gpa_rows:
+            all_profile_ids.add(row.profile_id)
+
+    # Replace user's profile access
+    db.query(UserProfileAccess).filter(UserProfileAccess.user_id == user.id).delete()
+    for pid in all_profile_ids:
+        db.add(UserProfileAccess(user_id=user.id, profile_id=pid))
+
+    db.commit()
+    logger.info(
+        "OIDC group sync: user_id=%d role=%s profiles=%s",
+        user.id, effective_role, sorted(all_profile_ids),
+    )
+
+
 def _issue_jwt_cookie(response: Response, user: User) -> None:
     """Issue a JWT httpOnly cookie using the same pattern as local login."""
     exp = datetime.now(UTC) + timedelta(hours=settings.JWT_EXPIRY_HOURS)
@@ -734,6 +795,12 @@ async def oidc_callback(request: Request, db: Session = Depends(get_db)):
     except Exception as exc:
         logger.warning("OIDC user provisioning failed: %s", exc)
         raise HTTPException(status_code=401, detail="oidc_callback_failed")
+
+    # Sync group-based role and profile access from OIDC claims
+    try:
+        _sync_user_groups(db, user, userinfo)
+    except Exception as exc:
+        logger.warning("OIDC group sync failed (non-fatal): %s", exc)
 
     logger.info("OIDC login: user_id=%d provider=%s", user.id, provider_name)
 
