@@ -31,6 +31,7 @@ def _create_segment(db, profile_id, start_time, duration=300.0, file_path=None):
         profile_id=profile_id,
         start_time=start_time,
         duration_seconds=duration,
+        end_time=start_time + timedelta(seconds=duration) if duration else None,
         file_path=file_path,
         file_size=1024000,
     )
@@ -161,3 +162,44 @@ def test_availability_with_gaps(authed_client, db):
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 2
+
+
+def test_availability_merges_near_contiguous_segments(db):
+    """Segments with sub-second gaps (typical FFmpeg behavior) merge into one range."""
+    profile = _create_profile(db)
+    # Simulate FFmpeg segments: 299.8s actual duration, 300s apart by filename
+    _create_segment(db, profile.id, datetime(2026, 3, 30, 10, 0), duration=299.8)
+    _create_segment(db, profile.id, datetime(2026, 3, 30, 10, 5), duration=299.8)
+    _create_segment(db, profile.id, datetime(2026, 3, 30, 10, 10), duration=299.8)
+
+    ranges = get_availability_ranges(
+        db, profile.id,
+        datetime(2026, 3, 30, 0, 0),
+        datetime(2026, 3, 31, 0, 0),
+    )
+    assert len(ranges) == 1  # Should merge, not be 3 separate bars
+
+
+def test_availability_does_not_merge_real_gaps(db):
+    """Segments separated by more than the tolerance stay separate."""
+    profile = _create_profile(db)
+    _create_segment(db, profile.id, datetime(2026, 3, 30, 10, 0), duration=300.0)
+    # 10-second gap — beyond tolerance
+    _create_segment(db, profile.id, datetime(2026, 3, 30, 10, 5, 10), duration=300.0)
+
+    ranges = get_availability_ranges(
+        db, profile.id,
+        datetime(2026, 3, 30, 0, 0),
+        datetime(2026, 3, 31, 0, 0),
+    )
+    assert len(ranges) == 2
+
+
+def test_playlist_no_discontinuity_for_near_contiguous(db):
+    """Near-contiguous segments should not produce HLS discontinuity markers."""
+    profile = _create_profile(db)
+    _create_segment(db, profile.id, datetime(2026, 3, 30, 10, 0), duration=299.8)
+    _create_segment(db, profile.id, datetime(2026, 3, 30, 10, 5), duration=299.8)
+
+    result = generate_playlist(db, profile.id, datetime(2026, 3, 30, 10, 0), datetime(2026, 3, 30, 11, 0))
+    assert "#EXT-X-DISCONTINUITY" not in result

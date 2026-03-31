@@ -7,10 +7,24 @@ from sqlalchemy.orm import Session
 
 from app.models import RecordingSegment
 
+# Maximum gap (seconds) between two segments that are still considered
+# contiguous.  Covers sub-second FFmpeg duration imprecision and minor
+# scheduling jitter without papering over real recording outages.
+CONTINUITY_GAP_TOLERANCE = 5
+
 
 def _strip_tz(dt: datetime) -> datetime:
     """Strip timezone info for SQLite string comparison compatibility."""
     return dt.replace(tzinfo=None) if dt.tzinfo else dt
+
+
+def _seg_end(seg, now: datetime) -> datetime:
+    """Return end_time for a segment, falling back to start + duration or now."""
+    if seg.end_time is not None:
+        return seg.end_time
+    if seg.duration_seconds is not None:
+        return seg.start_time + timedelta(seconds=seg.duration_seconds)
+    return now
 
 
 def generate_playlist(
@@ -60,7 +74,8 @@ def generate_playlist(
             # In-progress segment: use elapsed time as provisional duration
             dur = max(1.0, (now - seg.start_time).total_seconds())
 
-        if prev_end is not None and seg.start_time > prev_end + timedelta(seconds=1):
+        # Insert a discontinuity marker only when there's a real gap
+        if prev_end is not None and seg.start_time > prev_end + timedelta(seconds=CONTINUITY_GAP_TOLERANCE):
             lines.append("#EXT-X-DISCONTINUITY")
 
         lines.append(
@@ -81,6 +96,7 @@ def get_availability_ranges(
     segments = (
         db.query(
             RecordingSegment.start_time,
+            RecordingSegment.end_time,
             RecordingSegment.duration_seconds,
         )
         .filter(
@@ -95,21 +111,29 @@ def get_availability_ranges(
     )
 
     now = datetime.now(UTC).replace(tzinfo=None)
+    tolerance = timedelta(seconds=CONTINUITY_GAP_TOLERANCE)
 
-    ranges: list[dict] = []
-    for start, duration in segments:
-        if duration is not None:
+    # Build ranges using datetime objects, serialize at the end
+    merged: list[tuple[datetime, datetime]] = []
+    for start, end_time, duration in segments:
+        if end_time is not None:
+            end = end_time
+        elif duration is not None:
             end = start + timedelta(seconds=duration)
         else:
-            # In-progress segment: extend to now
             end = now
 
-        start_str = start.strftime("%Y-%m-%dT%H:%M:%S") + "Z"
-        end_str = end.strftime("%Y-%m-%dT%H:%M:%S") + "Z"
-        if ranges and start <= datetime.fromisoformat(ranges[-1]["end"].rstrip("Z")):
-            if end_str > ranges[-1]["end"]:
-                ranges[-1]["end"] = end_str
+        if merged and start <= merged[-1][1] + tolerance:
+            # Extend existing range if this segment's end is later
+            if end > merged[-1][1]:
+                merged[-1] = (merged[-1][0], end)
         else:
-            ranges.append({"start": start_str, "end": end_str})
+            merged.append((start, end))
 
-    return ranges
+    return [
+        {
+            "start": s.strftime("%Y-%m-%dT%H:%M:%S") + "Z",
+            "end": e.strftime("%Y-%m-%dT%H:%M:%S") + "Z",
+        }
+        for s, e in merged
+    ]
