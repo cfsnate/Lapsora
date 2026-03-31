@@ -8,7 +8,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import (
+    check_profile_access,
+    check_profile_permission,
+    get_accessible_profile_ids,
+    get_current_user,
+)
 from app.models import Timelapse, User
 from app.schemas import BulkDeleteRequest, TimelapseGenerate, TimelapseRead
 from app.services.generation_queue import enqueue_generation
@@ -28,11 +33,17 @@ def list_timelapses(
     period_type: str | None = None,
     limit: int = Query(default=50, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     stmt = select(Timelapse).order_by(Timelapse.created_at.desc())
     if profile_id is not None:
+        check_profile_access(current_user, profile_id, db)
         stmt = stmt.where(Timelapse.profile_id == profile_id)
+    else:
+        accessible_ids = get_accessible_profile_ids(current_user, db)
+        if accessible_ids is not None:
+            stmt = stmt.where(Timelapse.profile_id.in_(accessible_ids))
     if period_type is not None:
         stmt = stmt.where(Timelapse.period_type == period_type)
     stmt = stmt.offset(offset).limit(limit)
@@ -46,7 +57,10 @@ def list_timelapses(
 async def generate(
     profile_id: int,
     body: TimelapseGenerate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
+    check_profile_permission(current_user, profile_id, "can_timelapse", db)
     result = await enqueue_generation(
         profile_id=profile_id,
         period_type="custom",
@@ -74,18 +88,20 @@ async def generate(
 
 
 @router.get("/timelapses/{timelapse_id}", response_model=TimelapseRead)
-def get_timelapse(timelapse_id: int, db: Session = Depends(get_db)):
+def get_timelapse(timelapse_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     tl = db.get(Timelapse, timelapse_id)
     if not tl:
         raise HTTPException(404, "Timelapse not found")
+    check_profile_access(current_user, tl.profile_id, db)
     return tl
 
 
 @router.get("/timelapses/{timelapse_id}/video")
-def get_timelapse_video(timelapse_id: int, db: Session = Depends(get_db)):
+def get_timelapse_video(timelapse_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     tl = db.get(Timelapse, timelapse_id)
     if not tl:
         raise HTTPException(404, "Timelapse not found")
+    check_profile_access(current_user, tl.profile_id, db)
     if not os.path.exists(tl.file_path):
         raise HTTPException(404, "Timelapse file not found on disk")
     media_type = MEDIA_TYPES.get(tl.format, "application/octet-stream")
@@ -97,18 +113,21 @@ def get_timelapse_video(timelapse_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/timelapses/{timelapse_id}/thumbnail")
-def get_timelapse_thumbnail(timelapse_id: int, db: Session = Depends(get_db)):
+def get_timelapse_thumbnail(timelapse_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     tl = db.get(Timelapse, timelapse_id)
     if not tl:
         raise HTTPException(404, "Timelapse not found")
+    check_profile_access(current_user, tl.profile_id, db)
     if not tl.thumbnail_path or not os.path.exists(tl.thumbnail_path):
         raise HTTPException(404, "Thumbnail not available")
     return FileResponse(tl.thumbnail_path, media_type="image/jpeg")
 
 
 @router.delete("/timelapses/bulk", status_code=204)
-def bulk_delete_timelapses(body: BulkDeleteRequest, db: Session = Depends(get_db)):
+def bulk_delete_timelapses(body: BulkDeleteRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     tls = db.query(Timelapse).filter(Timelapse.id.in_(body.ids)).all()
+    for tl in tls:
+        check_profile_permission(current_user, tl.profile_id, "can_timelapse", db)
     for tl in tls:
         if os.path.exists(tl.file_path):
             os.unlink(tl.file_path)
@@ -119,10 +138,11 @@ def bulk_delete_timelapses(body: BulkDeleteRequest, db: Session = Depends(get_db
 
 
 @router.delete("/timelapses/{timelapse_id}", status_code=204)
-def delete_timelapse(timelapse_id: int, db: Session = Depends(get_db)):
+def delete_timelapse(timelapse_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     tl = db.get(Timelapse, timelapse_id)
     if not tl:
         raise HTTPException(404, "Timelapse not found")
+    check_profile_permission(current_user, tl.profile_id, "can_timelapse", db)
     if os.path.exists(tl.file_path):
         os.unlink(tl.file_path)
     if tl.thumbnail_path and os.path.exists(tl.thumbnail_path):

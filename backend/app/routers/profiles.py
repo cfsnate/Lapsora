@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.dependencies import check_profile_access, get_accessible_profile_ids, get_current_user, require_admin
+from app.dependencies import check_profile_access, check_profile_permission, get_accessible_profile_ids, get_current_user, require_admin
 from app.models import Profile, Stream, User
 from app.schemas import ProfileCreate, ProfileRead, ProfileUpdate
 from app.services import scheduler
@@ -62,7 +62,7 @@ async def update_profile(profile_id: int, body: ProfileUpdate, current_user: Use
     profile = db.get(Profile, profile_id)
     if not profile:
         raise HTTPException(404, "Profile not found")
-    check_profile_access(current_user, profile_id, db)
+    check_profile_permission(current_user, profile_id, "can_manage", db)
 
     update_data = body.model_dump(exclude_unset=True)
     needs_reschedule = any(
@@ -108,7 +108,7 @@ async def delete_profile(profile_id: int, current_user: User = Depends(get_curre
     profile = db.get(Profile, profile_id)
     if not profile:
         raise HTTPException(404, "Profile not found")
-    check_profile_access(current_user, profile_id, db)
+    check_profile_permission(current_user, profile_id, "can_manage", db)
 
     scheduler.remove_capture_job(profile.id)
 
@@ -132,7 +132,7 @@ def enable_profile(profile_id: int, current_user: User = Depends(get_current_use
     profile = db.get(Profile, profile_id)
     if not profile:
         raise HTTPException(404, "Profile not found")
-    check_profile_access(current_user, profile_id, db)
+    check_profile_permission(current_user, profile_id, "can_manage", db)
 
     profile.enabled = True
     db.commit()
@@ -147,7 +147,7 @@ def disable_profile(profile_id: int, current_user: User = Depends(get_current_us
     profile = db.get(Profile, profile_id)
     if not profile:
         raise HTTPException(404, "Profile not found")
-    check_profile_access(current_user, profile_id, db)
+    check_profile_permission(current_user, profile_id, "can_manage", db)
 
     profile.enabled = False
     db.commit()

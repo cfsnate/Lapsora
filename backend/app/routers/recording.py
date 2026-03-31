@@ -7,7 +7,7 @@ from sqlalchemy import func, or_, update
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.dependencies import check_profile_access, get_accessible_profile_ids, get_current_user, require_admin
+from app.dependencies import check_profile_access, check_profile_permission, get_accessible_profile_ids, get_current_user, require_admin
 from app.models import RecordingSegment, User
 from app.schemas import ProtectRequest, ProtectResponse
 
@@ -49,7 +49,7 @@ def get_recording_status(profile_id: int, current_user: User = Depends(get_curre
 @router.post("/{profile_id}/protect", response_model=ProtectResponse)
 def protect_segments(profile_id: int, body: ProtectRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Mark all overlapping segments as protected."""
-    check_profile_access(current_user, profile_id, db)
+    check_profile_permission(current_user, profile_id, "can_manage", db)
 
     stmt = (
         update(RecordingSegment)
@@ -71,7 +71,7 @@ def protect_segments(profile_id: int, body: ProtectRequest, current_user: User =
 @router.post("/{profile_id}/unprotect", response_model=ProtectResponse)
 def unprotect_segments(profile_id: int, body: ProtectRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Clear protection on all overlapping segments."""
-    check_profile_access(current_user, profile_id, db)
+    check_profile_permission(current_user, profile_id, "can_manage", db)
 
     stmt = (
         update(RecordingSegment)

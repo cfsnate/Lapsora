@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.dependencies import check_profile_access, get_current_user
+from app.dependencies import check_profile_access, check_profile_permission, get_current_user
 from app.models import ClipExport, User
 from app.schemas import ClipExportCreate, ClipExportRead
 from app.services.export_queue import cancel_export, enqueue_export
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api/exports", tags=["exports"], dependencies=[Depend
 
 @router.post("/", status_code=202)
 async def create_export(body: ClipExportCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    check_profile_access(current_user, body.profile_id, db)
+    check_profile_permission(current_user, body.profile_id, "can_export", db)
 
     clip_export = ClipExport(
         profile_id=body.profile_id,

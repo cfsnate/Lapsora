@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.dependencies import check_profile_access, get_accessible_profile_ids, get_current_user
+from app.dependencies import check_profile_access, check_profile_permission, get_accessible_profile_ids, get_current_user
 from app.models import Profile, TimelapseSchedule, User
 from app.schemas import (
     TimelapseScheduleCreate,
@@ -91,7 +91,7 @@ def create_schedule(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    check_profile_access(current_user, body.profile_id, db)
+    check_profile_permission(current_user, body.profile_id, "can_timelapse", db)
 
     # Validate profile exists
     profile = db.get(Profile, body.profile_id)
@@ -154,7 +154,7 @@ def update_schedule(
     if not schedule:
         raise HTTPException(404, "Schedule not found")
 
-    check_profile_access(current_user, schedule.profile_id, db)
+    check_profile_permission(current_user, schedule.profile_id, "can_timelapse", db)
 
     updates = body.model_dump(exclude_unset=True)
 
@@ -193,7 +193,7 @@ def delete_schedule(
     if not schedule:
         raise HTTPException(404, "Schedule not found")
 
-    check_profile_access(current_user, schedule.profile_id, db)
+    check_profile_permission(current_user, schedule.profile_id, "can_timelapse", db)
 
     remove_timelapse_schedule_job(schedule.id)
     db.delete(schedule)
@@ -210,7 +210,7 @@ async def trigger_schedule(
     if not schedule:
         raise HTTPException(404, "Schedule not found")
 
-    check_profile_access(current_user, schedule.profile_id, db)
+    check_profile_permission(current_user, schedule.profile_id, "can_timelapse", db)
 
     from datetime import UTC, datetime, timedelta
 
