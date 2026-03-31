@@ -275,6 +275,9 @@ class User(Base):
     profile_access: Mapped[list["UserProfileAccess"]] = relationship(
         "UserProfileAccess", cascade="all, delete-orphan"
     )
+    group_memberships: Mapped[list["UserGroupMembership"]] = relationship(
+        "UserGroupMembership", cascade="all, delete-orphan"
+    )
 
 
 class UserProfileAccess(Base):
@@ -284,6 +287,10 @@ class UserProfileAccess(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     profile_id: Mapped[int] = mapped_column(ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False)
+    can_view: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
+    can_export: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    can_timelapse: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    can_manage: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
 
 
 class Group(Base):
@@ -303,6 +310,9 @@ class Group(Base):
     oidc_mappings: Mapped[list["OIDCGroupMapping"]] = relationship(
         "OIDCGroupMapping", cascade="all, delete-orphan"
     )
+    members: Mapped[list["UserGroupMembership"]] = relationship(
+        "UserGroupMembership", cascade="all, delete-orphan"
+    )
 
 
 class GroupProfileAccess(Base):
@@ -312,6 +322,10 @@ class GroupProfileAccess(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     group_id: Mapped[int] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"), nullable=False)
     profile_id: Mapped[int] = mapped_column(ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False)
+    can_view: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
+    can_export: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    can_timelapse: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    can_manage: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
 
 
 class OIDCGroupMapping(Base):
@@ -319,6 +333,15 @@ class OIDCGroupMapping(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     oidc_group_name: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"), nullable=False)
+
+
+class UserGroupMembership(Base):
+    __tablename__ = "user_group_membership"
+    __table_args__ = (UniqueConstraint("user_id", "group_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     group_id: Mapped[int] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"), nullable=False)
 
 
