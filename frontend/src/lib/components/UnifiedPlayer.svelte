@@ -14,7 +14,7 @@
 	let { mode, wsUrl, hlsSrc, playbackRate = 1, onTimeUpdate, onError, onReady }: Props = $props();
 
 	let videoEl = $state<HTMLVideoElement | null>(null);
-	let hlsInstance = $state<Hls | null>(null);
+	let hlsInstance: Hls | null = null;
 	let status = $state<'connecting' | 'loading' | 'ready' | 'playing' | 'error'>('loading');
 	let errorMsg = $state('');
 
