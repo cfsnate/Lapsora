@@ -92,3 +92,60 @@ def get_segments_summary(profile_id: int, db: Session = Depends(get_db)):
         "earliest": row.earliest.isoformat() + "Z" if row.earliest else None,
         "latest": row.latest.isoformat() + "Z" if row.latest else None,
     }
+
+
+@router.get("/{profile_id}/segments/verify")
+async def verify_segments(profile_id: int, db: Session = Depends(get_db)):
+    """Re-probe all segments and compare ffprobe duration vs DB duration.
+    
+    Returns a list of segments with their DB-stored duration and the
+    freshly-probed duration, plus a mismatch flag.
+    """
+    import os
+    from app.config import settings
+    from app.services.recording import _get_segment_duration
+
+    segments = (
+        db.query(RecordingSegment)
+        .filter(RecordingSegment.profile_id == profile_id)
+        .order_by(RecordingSegment.start_time.asc())
+        .all()
+    )
+
+    results = []
+    for seg in segments:
+        abs_path = os.path.join(settings.DATA_DIR, seg.file_path)
+        file_exists = os.path.isfile(abs_path)
+        file_size = os.path.getsize(abs_path) if file_exists else 0
+        probed_duration = None
+        if file_exists:
+            probed_duration = await _get_segment_duration(abs_path)
+
+        db_dur = seg.duration_seconds
+        mismatch = False
+        if probed_duration is not None and db_dur is not None:
+            mismatch = abs(probed_duration - db_dur) > 1.0
+
+        results.append({
+            "id": seg.id,
+            "file_path": seg.file_path,
+            "file_exists": file_exists,
+            "file_size_bytes": file_size,
+            "start_time": seg.start_time.isoformat() + "Z" if seg.start_time else None,
+            "db_duration": db_dur,
+            "probed_duration": round(probed_duration, 2) if probed_duration else None,
+            "mismatch": mismatch,
+        })
+
+    mismatches = sum(1 for r in results if r["mismatch"])
+    missing_duration = sum(1 for r in results if r["db_duration"] is None)
+    missing_files = sum(1 for r in results if not r["file_exists"])
+
+    return {
+        "profile_id": profile_id,
+        "total_segments": len(results),
+        "mismatches": mismatches,
+        "missing_duration": missing_duration,
+        "missing_files": missing_files,
+        "segments": results,
+    }
