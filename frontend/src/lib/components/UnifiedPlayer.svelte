@@ -127,23 +127,31 @@
 			status = 'loading';
 			errorMsg = '';
 
+			const isLiveHls = mode === 'live';
+
 			if (Hls.isSupported()) {
-				const instance = new Hls({ maxBufferLength: 30, maxMaxBufferLength: 60 });
+				const instance = new Hls({
+					// For live HLS, be patient: the stream may take a few seconds to start
+					manifestLoadingMaxRetry: isLiveHls ? 10 : 2,
+					manifestLoadingRetryDelay: isLiveHls ? 1000 : 500,
+					manifestLoadingMaxRetryTimeout: isLiveHls ? 4000 : 2000,
+					levelLoadingMaxRetry: isLiveHls ? 10 : 2,
+					levelLoadingRetryDelay: isLiveHls ? 1000 : 500,
+					// Keep a modest buffer — live view doesn't need 30s
+					maxBufferLength: isLiveHls ? 8 : 30,
+					maxMaxBufferLength: isLiveHls ? 16 : 60,
+					// For live, start from the live edge
+					liveSyncDurationCount: 2,
+				});
 				instance.loadSource(hlsSrc);
 				instance.attachMedia(videoEl);
 
-				let retried = false;
 				instance.on(Hls.Events.MANIFEST_PARSED, () => {
 					status = 'ready';
 					onReady?.();
 				});
 				instance.on(Hls.Events.ERROR, (_event, data) => {
 					if (data.fatal) {
-						if (data.type === Hls.ErrorTypes.NETWORK_ERROR && !retried) {
-							retried = true;
-							instance.startLoad();
-							return;
-						}
 						status = 'error';
 						errorMsg = data.details || 'HLS playback failed';
 						onError?.(data.details || 'HLS playback failed');

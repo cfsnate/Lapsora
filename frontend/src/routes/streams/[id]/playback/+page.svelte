@@ -191,7 +191,7 @@
 		</div>
 
 		<!-- Video Player -->
-		{#if mode === 'live' || (mode === 'recording' && hlsSrc)}
+		{#if (mode === 'live' && (liveWsUrl || liveHlsSrc)) || (mode === 'recording' && hlsSrc)}
 			<UnifiedPlayer
 				{mode}
 				wsUrl={liveWsUrl ?? undefined}
@@ -201,6 +201,16 @@
 				onError={(msg) => console.error('Player error:', msg)}
 				onReady={() => { playing = true; }}
 			/>
+		{:else if mode === 'live'}
+			<div class="flex aspect-video w-full items-center justify-center overflow-hidden rounded-lg bg-black">
+				<div class="flex items-center gap-3 text-gray-400">
+					<svg class="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
+						<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" class="opacity-25"></circle>
+						<path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" class="opacity-75"></path>
+					</svg>
+					<span class="text-sm">Connecting to live stream...</span>
+				</div>
+			</div>
 		{:else}
 			<div class="flex aspect-video w-full items-center justify-center overflow-hidden rounded-lg bg-black">
 				<div class="text-center">
