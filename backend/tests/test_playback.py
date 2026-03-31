@@ -96,7 +96,11 @@ def test_playlist_endpoint_no_data(client, db):
         params={"start": "2026-03-30T10:00:00", "end": "2026-03-30T11:00:00"},
     )
 
-    assert resp.status_code == 404
+    # Empty range returns a valid empty VOD playlist (200) rather than 404,
+    # so HLS.js doesn't fatal on the response.
+    assert resp.status_code == 200
+    assert "#EXTM3U" in resp.text
+    assert "#EXT-X-ENDLIST" in resp.text
 
 
 def test_segment_endpoint_file_missing(client, db):
