@@ -11,13 +11,19 @@ from app.models import RecordingSegment
 def generate_playlist(
     db: Session, profile_id: int, start_time: datetime, end_time: datetime
 ) -> str:
+    # Strip timezone info before querying SQLite — SQLAlchemy renders aware
+    # datetimes as 'YYYY-MM-DDTHH:MM:SS+00:00' which compares incorrectly
+    # against SQLite's naive 'YYYY-MM-DD HH:MM:SS' strings (T > space).
+    start_naive = start_time.replace(tzinfo=None) if start_time.tzinfo else start_time
+    end_naive = end_time.replace(tzinfo=None) if end_time.tzinfo else end_time
+
     segments = (
         db.query(RecordingSegment)
         .filter(
             and_(
                 RecordingSegment.profile_id == profile_id,
-                RecordingSegment.start_time >= start_time,
-                RecordingSegment.start_time < end_time,
+                RecordingSegment.start_time >= start_naive,
+                RecordingSegment.start_time < end_naive,
             )
         )
         .order_by(RecordingSegment.start_time.asc())
@@ -59,6 +65,10 @@ def generate_playlist(
 def get_availability_ranges(
     db: Session, profile_id: int, day_start: datetime, day_end: datetime
 ) -> list[dict]:
+    # Strip timezone before SQLite query — same naive/aware mismatch as generate_playlist
+    start_naive = day_start.replace(tzinfo=None) if day_start.tzinfo else day_start
+    end_naive = day_end.replace(tzinfo=None) if day_end.tzinfo else day_end
+
     segments = (
         db.query(
             RecordingSegment.start_time,
@@ -67,8 +77,8 @@ def get_availability_ranges(
         .filter(
             and_(
                 RecordingSegment.profile_id == profile_id,
-                RecordingSegment.start_time >= day_start,
-                RecordingSegment.start_time < day_end,
+                RecordingSegment.start_time >= start_naive,
+                RecordingSegment.start_time < end_naive,
             )
         )
         .order_by(RecordingSegment.start_time.asc())
@@ -78,10 +88,13 @@ def get_availability_ranges(
     ranges: list[dict] = []
     for start, duration in segments:
         end = start + timedelta(seconds=duration or 0)
-        if ranges and start <= datetime.fromisoformat(ranges[-1]["end"]):
-            if end.isoformat() > ranges[-1]["end"]:
-                ranges[-1]["end"] = end.isoformat()
+        # Append Z so the browser parses these as UTC, not local time
+        start_str = start.strftime("%Y-%m-%dT%H:%M:%S") + "Z"
+        end_str = end.strftime("%Y-%m-%dT%H:%M:%S") + "Z"
+        if ranges and start <= datetime.fromisoformat(ranges[-1]["end"].rstrip("Z")):
+            if end_str > ranges[-1]["end"]:
+                ranges[-1]["end"] = end_str
         else:
-            ranges.append({"start": start.isoformat(), "end": end.isoformat()})
+            ranges.append({"start": start_str, "end": end_str})
 
     return ranges
