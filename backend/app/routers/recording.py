@@ -3,7 +3,7 @@
 import logging
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import or_, update
+from sqlalchemy import func, or_, update
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -69,3 +69,26 @@ def unprotect_segments(profile_id: int, body: ProtectRequest, db: Session = Depe
     result = db.execute(stmt)
     db.commit()
     return ProtectResponse(affected_count=result.rowcount)
+
+
+@router.get("/{profile_id}/segments/summary")
+def get_segments_summary(profile_id: int, db: Session = Depends(get_db)):
+    """Return a summary of recording segments for a profile."""
+    row = db.query(
+        func.count(RecordingSegment.id).label("count"),
+        func.coalesce(func.sum(RecordingSegment.file_size), 0).label("total_bytes"),
+        func.coalesce(func.sum(RecordingSegment.duration_seconds), 0).label("total_duration"),
+        func.min(RecordingSegment.start_time).label("earliest"),
+        func.max(RecordingSegment.start_time).label("latest"),
+    ).filter(
+        RecordingSegment.profile_id == profile_id,
+    ).one()
+
+    return {
+        "profile_id": profile_id,
+        "segment_count": row.count,
+        "total_bytes": row.total_bytes,
+        "total_duration_seconds": float(row.total_duration) if row.total_duration else 0,
+        "earliest": row.earliest.isoformat() + "Z" if row.earliest else None,
+        "latest": row.latest.isoformat() + "Z" if row.latest else None,
+    }

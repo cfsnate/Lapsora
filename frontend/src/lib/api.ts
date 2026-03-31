@@ -164,6 +164,7 @@ export const api = {
 	// Recording
 	getRecordingStatuses: () => request<Record<string, RecordingStatus>>('/recording/status'),
 	getRecordingStatus: (profileId: number) => request<RecordingStatus>(`/recording/status/${profileId}`),
+	getRecordingSegmentsSummary: (profileId: number) => request<{ profile_id: number; segment_count: number; total_bytes: number; total_duration_seconds: number; earliest: string | null; latest: string | null }>(`/recording/${profileId}/segments/summary`),
 
 	// Playback
 	getPlaylistUrl: (profileId: number, start: string, end: string) =>

@@ -4,12 +4,24 @@
 	import { formatDate, formatDateTime, formatDuration, formatBytes } from '$lib/utils';
 	import TimelapsePlayer from '$lib/components/TimelapsePlayer.svelte';
 
+	type RecordingSummary = {
+		profile_id: number;
+		profile_name: string;
+		stream_id: number;
+		segment_count: number;
+		total_bytes: number;
+		total_duration_seconds: number;
+		earliest: string | null;
+		latest: string | null;
+	};
+
 	let streams = $state<Stream[]>([]);
 	let selectedStreamId = $state<number | null>(null);
 	let selectedProfileId = $state<number | null>(null);
 	let profiles = $state<Profile[]>([]);
 	let captures = $state<Capture[]>([]);
 	let timelapses = $state<Timelapse[]>([]);
+	let recordingSummaries = $state<RecordingSummary[]>([]);
 	let loading = $state(true);
 	let loadingMedia = $state(false);
 
@@ -119,11 +131,11 @@
 		capturePage = 0;
 		captures = [];
 		timelapses = [];
+		recordingSummaries = [];
 		clearSelection();
 		try {
 			profiles = await api.getStreamProfiles(id);
-			await loadCaptures();
-			await loadTimelapses();
+			await Promise.all([loadCaptures(), loadTimelapses(), loadRecordingSummaries()]);
 		} catch {
 		} finally {
 			loadingMedia = false;
@@ -136,8 +148,7 @@
 		loadingMedia = true;
 		clearSelection();
 		try {
-			await loadCaptures();
-			await loadTimelapses();
+			await Promise.all([loadCaptures(), loadTimelapses(), loadRecordingSummaries()]);
 		} catch {
 		} finally {
 			loadingMedia = false;
@@ -169,6 +180,23 @@
 		}
 		allTimelapses.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 		timelapses = allTimelapses;
+	}
+
+	async function loadRecordingSummaries() {
+		const targetProfiles = selectedProfileId !== null
+			? profiles.filter((p) => p.id === selectedProfileId)
+			: profiles;
+		const recProfiles = targetProfiles.filter(p => p.recording_enabled);
+		const summaries: RecordingSummary[] = [];
+		for (const p of recProfiles) {
+			try {
+				const s = await api.getRecordingSegmentsSummary(p.id);
+				if (s.segment_count > 0) {
+					summaries.push({ ...s, profile_name: p.name, stream_id: p.stream_id });
+				}
+			} catch { /* profile may not have segments yet */ }
+		}
+		recordingSummaries = summaries;
 	}
 
 	async function changePage(delta: number) {
@@ -322,12 +350,55 @@
 			{/if}
 		</section>
 
-		<!-- Videos -->
+		<!-- Recordings -->
 		<section>
-			<h2 class="mb-4 text-xl font-semibold text-white">Videos</h2>
+			<h2 class="mb-4 text-xl font-semibold text-white">Recordings</h2>
+			{#if recordingSummaries.length === 0}
+				<div class="rounded-xl border border-gray-800 bg-gray-900 p-6 text-center">
+					<p class="text-gray-400">No recordings found for this stream.</p>
+				</div>
+			{:else}
+				<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+					{#each recordingSummaries as rs}
+						<a
+							href="/streams/{rs.stream_id}/playback"
+							class="group rounded-xl border border-gray-800 bg-gray-900 p-5 transition-colors hover:border-gray-700 hover:bg-gray-800"
+						>
+							<div class="mb-3 flex items-center justify-between">
+								<span class="text-sm font-medium text-gray-100">{rs.profile_name}</span>
+								<span class="rounded bg-green-900 px-2 py-0.5 text-xs font-medium text-green-300">{rs.segment_count} segments</span>
+							</div>
+							<div class="grid grid-cols-2 gap-3 text-xs text-gray-400">
+								<div>
+									<span class="text-gray-600">Total size</span>
+									<p class="text-gray-300">{formatBytes(rs.total_bytes)}</p>
+								</div>
+								<div>
+									<span class="text-gray-600">Duration</span>
+									<p class="text-gray-300">{formatDuration(rs.total_duration_seconds)}</p>
+								</div>
+								<div>
+									<span class="text-gray-600">Earliest</span>
+									<p class="text-gray-300">{rs.earliest ? formatDateTime(rs.earliest) : '--'}</p>
+								</div>
+								<div>
+									<span class="text-gray-600">Latest</span>
+									<p class="text-gray-300">{rs.latest ? formatDateTime(rs.latest) : '--'}</p>
+								</div>
+							</div>
+							<p class="mt-3 text-xs font-medium text-blue-400 group-hover:text-blue-300">Open playback →</p>
+						</a>
+					{/each}
+				</div>
+			{/if}
+		</section>
+
+		<!-- Timelapses -->
+		<section>
+			<h2 class="mb-4 text-xl font-semibold text-white">Timelapses</h2>
 			{#if timelapses.length === 0}
 				<div class="rounded-xl border border-gray-800 bg-gray-900 p-6 text-center">
-					<p class="text-gray-400">No timelapse videos found for this stream.</p>
+					<p class="text-gray-400">No timelapses found for this stream.</p>
 				</div>
 			{:else}
 				<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -523,7 +594,7 @@
 					and
 				{/if}
 				{#if selectedTimelapseIds.length > 0}
-					{selectedTimelapseIds.length} video{selectedTimelapseIds.length !== 1 ? 's' : ''}
+					{selectedTimelapseIds.length} timelapse{selectedTimelapseIds.length !== 1 ? 's' : ''}
 				{/if}
 				will be permanently deleted.
 			</p>
