@@ -52,7 +52,9 @@ async def handle_event(event_type: str, title: str, body: str, level: str = "inf
     """Event listener registered on the event bus. Persists, broadcasts SSE, sends Apprise."""
 
     # Transient progress events: push to SSE only, no DB persistence or Apprise
-    if event_type == "timelapse_progress":
+    transient_events = {"timelapse_progress", "timelapse_queued", "timelapse_queue_updated",
+                        "timelapse_cancelled", "recording_status"}
+    if event_type in transient_events:
         sse_data = json.dumps({"event_type": event_type, **(data or {})})
         with _sse_lock:
             queues = list(sse_queues)
@@ -65,7 +67,12 @@ async def handle_event(event_type: str, title: str, body: str, level: str = "inf
 
     db = SessionLocal()
     try:
-        # 1. Always persist to notifications table
+        # Check if this event type is enabled in user settings
+        toggles = _get_event_toggles(db)
+        if not toggles.get(event_type, True):
+            return
+
+        # 1. Persist to notifications table
         notification = Notification(
             event_type=event_type,
             title=title,
@@ -93,12 +100,7 @@ async def handle_event(event_type: str, title: str, body: str, level: str = "inf
             except asyncio.QueueFull:
                 pass
 
-        # 3. Check if this event type is enabled for external delivery
-        toggles = _get_event_toggles(db)
-        if not toggles.get(event_type, False):
-            return
-
-        # 4. Send via Apprise to all enabled notification URLs
+        # 3. Send via Apprise to all enabled notification URLs
         urls = db.query(NotificationURL).filter(NotificationURL.enabled.is_(True)).all()
         if not urls:
             return
