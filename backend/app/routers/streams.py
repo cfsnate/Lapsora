@@ -115,10 +115,21 @@ async def test_stream(stream_id: int, db: Session = Depends(get_db)):
 
 @router.get("/{stream_id}/preview")
 async def preview_stream(stream_id: int, db: Session = Depends(get_db)):
+    import os
     stream = db.get(Stream, stream_id)
     if not stream:
         raise HTTPException(404, "Stream not found")
 
+    # Serve cached preview thumbnail if available (updated by capture jobs)
+    preview_path = os.path.join(settings.DATA_DIR, "previews", f"{stream_id}.jpg")
+    if os.path.isfile(preview_path):
+        return FileResponse(
+            preview_path,
+            media_type="image/jpeg",
+            headers={"Cache-Control": "public, max-age=30"},
+        )
+
+    # Fallback: live grab (slow, spawns FFmpeg)
     if stream.source_type == "go2rtc":
         base_url = go2rtc.get_go2rtc_url(db)
         if not base_url:
@@ -137,8 +148,7 @@ async def preview_stream(stream_id: int, db: Session = Depends(get_db)):
         jpeg_bytes = await rtsp.grab_frame(url)
     except RuntimeError as exc:
         raise HTTPException(502, str(exc))
-    return Response(content=jpeg_bytes, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=5"})
-
+    return Response(content=jpeg_bytes, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=30"})
 
 @router.get("/{stream_id}/live-url")
 async def get_live_url(stream_id: int, db: Session = Depends(get_db)):

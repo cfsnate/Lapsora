@@ -377,6 +377,16 @@ async def capture_frame(profile_id: int) -> None:
         from app.services.capture_gap import clear_alert
         clear_alert(profile_id)
 
+        # Save a copy as the stream preview thumbnail (served by /api/streams/{id}/preview)
+        try:
+            preview_dir = os.path.join(settings.DATA_DIR, "previews")
+            os.makedirs(preview_dir, exist_ok=True)
+            preview_path = os.path.join(preview_dir, f"{stream.id}.jpg")
+            import shutil
+            shutil.copy2(abs_path, preview_path)
+        except Exception:
+            pass  # Preview update is best-effort
+
         logger.info(
             "Captured frame for profile %d: %s (%dx%d, %d bytes)",
             profile_id, rel_path, width, height, file_size,
