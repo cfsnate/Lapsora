@@ -137,7 +137,7 @@ async def preview_stream(stream_id: int, db: Session = Depends(get_db)):
         jpeg_bytes = await rtsp.grab_frame(url)
     except RuntimeError as exc:
         raise HTTPException(502, str(exc))
-    return Response(content=jpeg_bytes, media_type="image/jpeg")
+    return Response(content=jpeg_bytes, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=5"})
 
 
 @router.get("/{stream_id}/live-url")
