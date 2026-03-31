@@ -492,19 +492,28 @@ async def scan_segments() -> None:
     Two-pass approach:
     1. New files above MIN_SEGMENT_SIZE are registered immediately — even while
        still being written — with duration_seconds=NULL so the timeline shows them.
-    2. Once a file is older than 30s (FFmpeg has moved on), we probe it with ffprobe
-       and fill in the real duration and end_time.
+    2. A segment is considered complete when a newer segment file exists in the same
+       directory (meaning FFmpeg has moved on to writing the next segment). At that
+       point we probe with ffprobe and fill in the real duration.
     """
     db = SessionLocal()
     try:
         profiles = db.query(Profile).filter(Profile.recording_enabled.is_(True)).all()
-        now = datetime.now(UTC)
-        stable_cutoff = now - timedelta(seconds=30)
 
         for profile in profiles:
             output_dir = recording_dir(profile)
             if not os.path.isdir(output_dir):
                 continue
+
+            # Collect all .ts filenames sorted by name (= chronological)
+            ts_files = sorted(
+                f for f in os.listdir(output_dir) if f.endswith(".ts")
+            )
+            if not ts_files:
+                continue
+
+            # The last file in sorted order is the one currently being written
+            latest_fname = ts_files[-1]
 
             # Map known segments by file_path for quick lookup + update
             existing = {
@@ -514,9 +523,7 @@ async def scan_segments() -> None:
                 .all()
             }
 
-            for fname in os.listdir(output_dir):
-                if not fname.endswith(".ts"):
-                    continue
+            for fname in ts_files:
                 fpath = os.path.join(output_dir, fname)
                 rel_path = recording_rel(profile, fname)
 
@@ -527,13 +534,13 @@ async def scan_segments() -> None:
                 if stat.st_size < MIN_SEGMENT_SIZE:
                     continue
 
-                mtime = datetime.fromtimestamp(stat.st_mtime, tz=UTC)
-                is_stable = mtime <= stable_cutoff
+                # A segment is complete once a newer file exists (FFmpeg moved on)
+                is_complete = fname != latest_fname
 
                 if rel_path not in existing:
                     # Register immediately — duration is NULL for in-progress segments
                     start_time = _parse_segment_timestamp(fname)
-                    duration = await _get_segment_duration(fpath) if is_stable else None
+                    duration = await _get_segment_duration(fpath) if is_complete else None
 
                     segment = RecordingSegment(
                         profile_id=profile.id,
@@ -546,8 +553,8 @@ async def scan_segments() -> None:
                     db.add(segment)
                     recording_manager.on_segment_produced(profile.id)
 
-                elif is_stable and existing[rel_path].duration_seconds is None:
-                    # Backfill: file is now stable, probe real duration
+                elif is_complete and existing[rel_path].duration_seconds is None:
+                    # Backfill: segment is complete, probe real duration
                     seg = existing[rel_path]
                     duration = await _get_segment_duration(fpath)
                     if duration is not None:

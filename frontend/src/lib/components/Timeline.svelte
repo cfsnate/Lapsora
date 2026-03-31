@@ -19,7 +19,12 @@
 	let dragStartX = $state(0);
 	let dragStartView = $state<{ start: number; end: number }>({ start: 0, end: 0 });
 	let activeZoom = $state('1h');
-	let selectedDate = $state(new Date().toISOString().slice(0, 16));
+	function toLocalISOString(d: Date): string {
+		const pad = (n: number) => String(n).padStart(2, '0');
+		return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+	}
+
+	let selectedDate = $state(toLocalISOString(new Date()));
 
 	const zoomPresets = [
 		{ label: '1h', ms: 60 * 60 * 1000 },
@@ -254,10 +259,10 @@
 	</div>
 
 	<!-- Time axis labels -->
-	<div class="relative h-4">
+	<div class="relative h-4 overflow-hidden">
 		{#each timeLabels as label}
-			<span class="absolute text-xs text-gray-500"
-				style="transform: translateX(calc({label.x}px - 50%));">{label.label}</span>
+			<span class="absolute text-xs text-gray-500 whitespace-nowrap"
+				style="left: {Math.max(0, Math.min(containerWidth - 40, label.x))}px; transform: translateX(-50%);">{label.label}</span>
 		{/each}
 	</div>
 
