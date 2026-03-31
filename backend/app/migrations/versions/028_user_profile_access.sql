@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS user_profile_access (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    profile_id INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    UNIQUE(user_id, profile_id)
+);

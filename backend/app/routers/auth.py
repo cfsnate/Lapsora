@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.config import decrypt, encrypt, settings
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, require_admin
 from app.models import Setting, User
 from app.schemas import (
     LoginRequest,
@@ -269,11 +269,9 @@ def get_oidc_config(db: Session = Depends(get_db)):
 def put_oidc_config(
     payload: OIDCConfigUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     """Save OIDC provider config (admin-only)."""
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="admin_required")
 
     encrypted_secret = encrypt(payload.client_secret)
 

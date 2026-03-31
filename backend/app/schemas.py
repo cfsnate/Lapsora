@@ -601,3 +601,31 @@ class OIDCConfigUpdate(BaseModel):
     client_id: str
     client_secret: str
     provider_name: str | None = None
+
+
+# --- User management (RBAC) ---
+
+
+class UserCreate(BaseModel):
+    username: str
+    display_name: str
+    password: str
+    role: str = "user"
+    email: str | None = None
+    is_active: bool = True
+
+
+class UserUpdate(BaseModel):
+    display_name: str | None = None
+    email: str | None = None
+    role: str | None = None
+    is_active: bool | None = None
+    password: str | None = None
+
+
+class UserProfileAccessUpdate(BaseModel):
+    profile_ids: list[int]
+
+
+class UserAdminRead(UserRead):
+    accessible_profile_ids: list[int]

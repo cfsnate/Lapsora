@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -271,6 +271,19 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(
         default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
     )
+
+    profile_access: Mapped[list["UserProfileAccess"]] = relationship(
+        "UserProfileAccess", cascade="all, delete-orphan"
+    )
+
+
+class UserProfileAccess(Base):
+    __tablename__ = "user_profile_access"
+    __table_args__ = (UniqueConstraint("user_id", "profile_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    profile_id: Mapped[int] = mapped_column(ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False)
 
 
 class NotificationURL(Base):
