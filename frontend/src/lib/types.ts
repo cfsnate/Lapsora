@@ -584,3 +584,30 @@ export interface GroupUpdate {
 	profile_ids?: number[];
 	oidc_group_names?: string[];
 }
+
+// --- TLS / ACME ---
+
+export interface TLSConfig {
+	domain: string;
+	email: string;
+	acme_directory_url: string;
+	enabled: boolean;
+	has_certificate: boolean;
+}
+
+export interface TLSConfigUpdate {
+	domain?: string;
+	email?: string;
+	acme_directory_url?: string;
+	enabled?: boolean;
+}
+
+export interface TLSCertificateInfo {
+	domain: string;
+	issuer: string;
+	not_before: string;
+	not_after: string;
+	serial_number: string;
+	is_expired: boolean;
+	days_until_expiry: number;
+}

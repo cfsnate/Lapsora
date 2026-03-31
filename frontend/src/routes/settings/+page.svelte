@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { api } from '$lib/api';
 	import { setUse24h } from '$lib/utils';
-	import type { NotificationURL, NotificationEventsConfig, HealthConfig, LocationConfig, CaptureGapConfig, Go2rtcConfig, TimeFormatConfig, OIDCConfig, OIDCConfigUpdate } from '$lib/types';
+	import type { NotificationURL, NotificationEventsConfig, HealthConfig, LocationConfig, CaptureGapConfig, Go2rtcConfig, TimeFormatConfig, OIDCConfig, OIDCConfigUpdate, TLSConfig, TLSCertificateInfo } from '$lib/types';
 	import CleanupScheduleManager from '$lib/components/CleanupScheduleManager.svelte';
 
 	let urls = $state<NotificationURL[]>([]);
@@ -53,6 +53,15 @@
 	let savingOIDC = $state(false);
 	let oidcSaveResult = $state<{ ok: boolean; message: string } | null>(null);
 
+	// TLS config state
+	let tlsConfig = $state<TLSConfig | null>(null);
+	let tlsForm = $state({ domain: '', email: '', acme_directory_url: 'https://acme-v02.api.letsencrypt.org/directory', enabled: false });
+	let savingTLS = $state(false);
+	let tlsSaveResult = $state<{ ok: boolean; message: string } | null>(null);
+	let certInfo = $state<TLSCertificateInfo | null>(null);
+	let acquiring = $state(false);
+	let acquireResult = $state<{ ok: boolean; message: string } | null>(null);
+
 	let loading = $state(true);
 	let newLabel = $state('');
 	let newUrl = $state('');
@@ -87,6 +96,20 @@
 			};
 		}).catch(() => {
 			// OIDC not yet configured
+		});
+		api.getTLSConfig().then((cfg) => {
+			tlsConfig = cfg;
+			tlsForm = {
+				domain: cfg.domain,
+				email: cfg.email,
+				acme_directory_url: cfg.acme_directory_url || 'https://acme-v02.api.letsencrypt.org/directory',
+				enabled: cfg.enabled,
+			};
+			if (cfg.has_certificate) {
+				api.getCertificateInfo().then((info) => { certInfo = info; }).catch(() => {});
+			}
+		}).catch(() => {
+			// TLS not loaded — user may not be admin
 		});
 	});
 
@@ -235,6 +258,37 @@
 			oidcSaveResult = { ok: false, message: err instanceof Error ? err.message : 'Failed to save OIDC configuration.' };
 		} finally {
 			savingOIDC = false;
+		}
+	}
+
+	async function saveTLSConfig() {
+		savingTLS = true;
+		tlsSaveResult = null;
+		try {
+			const updated = await api.saveTLSConfig(tlsForm);
+			tlsConfig = updated;
+			tlsSaveResult = { ok: true, message: 'TLS configuration saved.' };
+		} catch (err) {
+			tlsSaveResult = { ok: false, message: err instanceof Error ? err.message : 'Failed to save TLS configuration.' };
+		} finally {
+			savingTLS = false;
+		}
+	}
+
+	async function acquireCert(force = false) {
+		acquiring = true;
+		acquireResult = null;
+		try {
+			const result = await api.acquireCertificate(force);
+			acquireResult = { ok: result.success, message: result.message };
+			// Refresh cert info after acquisition
+			try { certInfo = await api.getCertificateInfo(); } catch { /* no cert yet */ }
+			// Refresh config to update has_certificate
+			try { tlsConfig = await api.getTLSConfig(); } catch { /* ignore */ }
+		} catch (err) {
+			acquireResult = { ok: false, message: err instanceof Error ? err.message : 'Certificate acquisition failed.' };
+		} finally {
+			acquiring = false;
 		}
 	}
 
@@ -660,6 +714,124 @@
 			</div>
 		</section>
 	{/if}
+
+		<!-- TLS / ACME Certificates -->
+		{#if tlsConfig !== null}
+		<section class="rounded-xl border border-gray-800 bg-gray-900 p-6">
+			<div class="space-y-4">
+				<h3 class="mb-1 text-lg font-medium text-white">TLS / ACME Certificates</h3>
+				<p class="text-sm text-gray-400">
+					Acquire and manage TLS certificates via ACME (Let's Encrypt). Port binding is configured in your Docker Compose file.
+				</p>
+
+				<!-- Current certificate status -->
+				{#if certInfo}
+					<div class="rounded-lg border {certInfo.is_expired ? 'border-red-700 bg-red-950/30' : certInfo.days_until_expiry <= 30 ? 'border-yellow-700 bg-yellow-950/30' : 'border-green-700 bg-green-950/30'} p-4">
+						<div class="flex items-center gap-2 mb-2">
+							{#if certInfo.is_expired}
+								<span class="inline-block h-2 w-2 rounded-full bg-red-400"></span>
+								<span class="text-sm font-medium text-red-300">Certificate Expired</span>
+							{:else if certInfo.days_until_expiry <= 30}
+								<span class="inline-block h-2 w-2 rounded-full bg-yellow-400"></span>
+								<span class="text-sm font-medium text-yellow-300">Expires in {certInfo.days_until_expiry} days</span>
+							{:else}
+								<span class="inline-block h-2 w-2 rounded-full bg-green-400"></span>
+								<span class="text-sm font-medium text-green-300">Valid — {certInfo.days_until_expiry} days remaining</span>
+							{/if}
+						</div>
+						<div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-400">
+							<span>Domain</span><span class="text-gray-300">{certInfo.domain}</span>
+							<span>Issuer</span><span class="text-gray-300">{certInfo.issuer}</span>
+							<span>Valid from</span><span class="text-gray-300">{new Date(certInfo.not_before).toLocaleDateString()}</span>
+							<span>Valid until</span><span class="text-gray-300">{new Date(certInfo.not_after).toLocaleDateString()}</span>
+						</div>
+					</div>
+				{:else if tlsConfig.has_certificate}
+					<p class="text-sm text-gray-400">Certificate present but info unavailable.</p>
+				{:else}
+					<div class="rounded-lg border border-gray-700 bg-gray-800/50 p-3">
+						<p class="text-sm text-gray-400">No certificate installed. Configure a domain and acquire one below.</p>
+					</div>
+				{/if}
+
+				<!-- Config form -->
+				<form onsubmit={(e) => { e.preventDefault(); saveTLSConfig(); }} class="space-y-4">
+					<div class="flex items-center gap-3">
+						<label class="relative inline-flex cursor-pointer items-center">
+							<input type="checkbox" bind:checked={tlsForm.enabled} class="peer sr-only" />
+							<div class="peer h-5 w-9 rounded-full bg-gray-600 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all peer-checked:bg-blue-600 peer-checked:after:translate-x-full"></div>
+						</label>
+						<span class="text-sm text-gray-300">Enable TLS</span>
+					</div>
+					<div>
+						<label for="tls-domain" class="mb-1 block text-sm font-medium text-gray-300">Domain</label>
+						<input
+							id="tls-domain"
+							type="text"
+							bind:value={tlsForm.domain}
+							placeholder="nvr.example.com"
+							class="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+						/>
+					</div>
+					<div>
+						<label for="tls-email" class="mb-1 block text-sm font-medium text-gray-300">ACME Email</label>
+						<input
+							id="tls-email"
+							type="email"
+							bind:value={tlsForm.email}
+							placeholder="admin@example.com"
+							class="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+						/>
+						<p class="mt-1 text-xs text-gray-500">Let's Encrypt will send expiry warnings to this address.</p>
+					</div>
+					<div>
+						<label for="tls-acme-url" class="mb-1 block text-sm font-medium text-gray-300">ACME Directory URL</label>
+						<input
+							id="tls-acme-url"
+							type="url"
+							bind:value={tlsForm.acme_directory_url}
+							placeholder="https://acme-v02.api.letsencrypt.org/directory"
+							class="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+						/>
+						<p class="mt-1 text-xs text-gray-500">Default is Let's Encrypt production. Use a custom ACME CA if needed.</p>
+					</div>
+					{#if tlsSaveResult}
+						<p class="text-sm {tlsSaveResult.ok ? 'text-green-400' : 'text-red-400'}">{tlsSaveResult.message}</p>
+					{/if}
+					<div class="flex gap-3">
+						<button
+							type="submit"
+							disabled={savingTLS}
+							class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-500 disabled:opacity-50"
+						>
+							{savingTLS ? 'Saving...' : 'Save Configuration'}
+						</button>
+						<button
+							type="button"
+							disabled={acquiring || !tlsForm.domain}
+							onclick={() => acquireCert(false)}
+							class="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-500 disabled:opacity-50"
+						>
+							{acquiring ? 'Acquiring...' : 'Acquire Certificate'}
+						</button>
+						{#if tlsConfig?.has_certificate}
+							<button
+								type="button"
+								disabled={acquiring}
+								onclick={() => acquireCert(true)}
+								class="rounded-lg border border-gray-600 px-4 py-2 text-sm text-gray-300 transition-colors hover:bg-gray-800 disabled:opacity-50"
+							>
+								Force Renew
+							</button>
+						{/if}
+					</div>
+					{#if acquireResult}
+						<p class="text-sm {acquireResult.ok ? 'text-green-400' : 'text-red-400'}">{acquireResult.message}</p>
+					{/if}
+				</form>
+			</div>
+		</section>
+		{/if}
 </div>
 
 <!-- Delete All Recordings Confirmation Modal -->

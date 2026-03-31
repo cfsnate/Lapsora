@@ -1,4 +1,4 @@
-import type { Stream, StreamCreate, StreamUpdate, Profile, ProfileCreate, ProfileUpdate, ProfileTemplate, ProfileTemplateCreate, Capture, Timelapse, TimelapseGenerate, TimelapseSchedule, TimelapseScheduleCreate, TimelapseScheduleUpdate, CleanupSchedule, CleanupScheduleCreate, CleanupScheduleUpdate, TestResult, StorageStats, Notification, NotificationURL, HealthConfig, NotificationEventsConfig, LocationConfig, CaptureGapConfig, TimeFormatConfig, StatsSummary, StorageTrendPoint, CaptureActivityPoint, ProfileStoragePoint, Go2rtcConfig, Go2rtcStreamInfo, TimelapseSummary, RecordingStatus, RecordingStorageStats, RecordingRetentionConfig, PlaybackAvailabilityRange, ClipExport, ClipExportCreate, SetupStatus, SetupCreate, AuthUser, LoginCredentials, OIDCConfig, OIDCConfigUpdate, UserAdminRead, UserCreate, UserUpdate, UserProfileAccessUpdate, SelfUpdate, GroupRead, GroupCreate, GroupUpdate } from './types';
+import type { Stream, StreamCreate, StreamUpdate, Profile, ProfileCreate, ProfileUpdate, ProfileTemplate, ProfileTemplateCreate, Capture, Timelapse, TimelapseGenerate, TimelapseSchedule, TimelapseScheduleCreate, TimelapseScheduleUpdate, CleanupSchedule, CleanupScheduleCreate, CleanupScheduleUpdate, TestResult, StorageStats, Notification, NotificationURL, HealthConfig, NotificationEventsConfig, LocationConfig, CaptureGapConfig, TimeFormatConfig, StatsSummary, StorageTrendPoint, CaptureActivityPoint, ProfileStoragePoint, Go2rtcConfig, Go2rtcStreamInfo, TimelapseSummary, RecordingStatus, RecordingStorageStats, RecordingRetentionConfig, PlaybackAvailabilityRange, ClipExport, ClipExportCreate, SetupStatus, SetupCreate, AuthUser, LoginCredentials, OIDCConfig, OIDCConfigUpdate, UserAdminRead, UserCreate, UserUpdate, UserProfileAccessUpdate, SelfUpdate, GroupRead, GroupCreate, GroupUpdate, TLSConfig, TLSConfigUpdate, TLSCertificateInfo } from './types';
 
 const BASE = '/api';
 
@@ -220,4 +220,10 @@ export const api = {
 	createGroup: (data: GroupCreate) => request<GroupRead>('/auth/groups', { method: 'POST', body: JSON.stringify(data) }),
 	updateGroup: (id: number, data: GroupUpdate) => request<GroupRead>(`/auth/groups/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
 	deleteGroup: (id: number) => request<void>(`/auth/groups/${id}`, { method: 'DELETE' }),
+
+	// TLS / ACME (admin)
+	getTLSConfig: () => request<TLSConfig>('/tls/config'),
+	saveTLSConfig: (data: TLSConfigUpdate) => request<TLSConfig>('/tls/config', { method: 'PUT', body: JSON.stringify(data) }),
+	acquireCertificate: (force = false) => request<{ success: boolean; message: string }>('/tls/acquire', { method: 'POST', body: JSON.stringify({ force }) }),
+	getCertificateInfo: () => request<TLSCertificateInfo>('/tls/certificate'),
 };
