@@ -12,8 +12,8 @@
 
 	let containerEl = $state<HTMLDivElement | null>(null);
 	let containerWidth = $state(800);
-	let viewStart = $state<Date>(new Date(new Date().setHours(0, 0, 0, 0)));
-	let viewEnd = $state<Date>(new Date(new Date().setHours(24, 0, 0, 0)));
+	let viewStart = $state<Date>(new Date(Date.now() - 24 * 60 * 60 * 1000));
+	let viewEnd = $state<Date>(new Date());
 	let hoverX = $state<number | null>(null);
 	let isDragging = $state(false);
 	let dragStartX = $state(0);
@@ -101,8 +101,15 @@
 		newRange = Math.max(MIN_WINDOW_MS, Math.min(MAX_WINDOW_MS, newRange));
 
 		const mouseTime = viewStart.getTime() + mouseRatio * currentRange;
-		const newStart = mouseTime - mouseRatio * newRange;
-		const newEnd = mouseTime + (1 - mouseRatio) * newRange;
+		let newStart = mouseTime - mouseRatio * newRange;
+		let newEnd = mouseTime + (1 - mouseRatio) * newRange;
+
+		// Don't let the view extend past now
+		const now = Date.now();
+		if (newEnd > now) {
+			newEnd = now;
+			newStart = now - newRange;
+		}
 
 		viewStart = new Date(newStart);
 		viewEnd = new Date(newEnd);
@@ -167,9 +174,9 @@
 	}
 
 	function handleZoomPreset(preset: { label: string; ms: number }) {
-		const center = (viewStart.getTime() + viewEnd.getTime()) / 2;
-		viewStart = new Date(center - preset.ms / 2);
-		viewEnd = new Date(center + preset.ms / 2);
+		const now = Date.now();
+		viewEnd = new Date(now);
+		viewStart = new Date(now - preset.ms);
 		activeZoom = preset.label;
 	}
 

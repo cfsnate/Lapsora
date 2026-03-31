@@ -21,6 +21,9 @@
 	let playing = $state(false);
 	let hlsSrc = $state('');
 	let liveWsUrl = $state<string | null>(null);
+	// Separate tracking for the playback window so hlsSrc mutations don't re-trigger effects
+	let playbackWindowStart = $state<Date | null>(null);
+	let playbackWindowEnd = $state<Date | null>(null);
 
 	let availabilityRanges = $state<PlaybackAvailabilityRange[]>([]);
 
@@ -31,7 +34,6 @@
 
 	let recordingProfiles = $derived(profiles.filter(p => p.recording_enabled));
 	let selectedProfile = $derived(recordingProfiles.find(p => p.id === selectedProfileId) ?? null);
-	let canGoLive = $derived(stream?.source_type === 'go2rtc');
 
 	$effect(() => {
 		const currentId = id;
@@ -45,15 +47,12 @@
 				const recProfiles = p.filter(pr => pr.recording_enabled);
 				selectedProfileId = recProfiles[0]?.id ?? null;
 
-				if (s.source_type === 'go2rtc') {
-					mode = 'live';
-					try {
-						const data = await api.getStreamLiveUrl(currentId);
-						liveWsUrl = data.ws_url;
-					} catch { /* live URL unavailable */ }
-				} else {
-					mode = 'recording';
-				}
+				// Always start in live mode and attempt to get the live URL
+				mode = 'live';
+				try {
+					const data = await api.getStreamLiveUrl(currentId);
+					liveWsUrl = data.ws_url;
+				} catch { /* live URL unavailable */ }
 			})
 			.catch((err) => { error = err instanceof Error ? err.message : 'Failed to load'; })
 			.finally(() => { loading = false; });
@@ -72,6 +71,8 @@
 		mode = 'recording';
 		const start = new Date(time.getTime() - 30 * 60 * 1000);
 		const end = new Date(time.getTime() + 30 * 60 * 1000);
+		playbackWindowStart = start;
+		playbackWindowEnd = end;
 		hlsSrc = api.getPlaylistUrl(selectedProfileId, start.toISOString(), end.toISOString());
 		playing = true;
 	}
@@ -79,8 +80,10 @@
 	function handleGoLive() {
 		mode = 'live';
 		hlsSrc = '';
+		playbackWindowStart = null;
+		playbackWindowEnd = null;
 		playbackRate = 1;
-		if (!liveWsUrl && canGoLive) {
+		if (!liveWsUrl) {
 			api.getStreamLiveUrl(id).then(d => { liveWsUrl = d.ws_url; }).catch(() => {});
 		}
 	}
@@ -96,13 +99,13 @@
 	function handleTimeUpdate(time: Date | null) {
 		currentTime = time;
 		if (!time || !selectedProfileId || mode !== 'recording') return;
-		const src = hlsSrc;
-		if (!src) return;
-		const params = new URL(src, window.location.origin).searchParams;
-		const windowEnd = new Date(params.get('end') ?? '');
-		if (!isNaN(windowEnd.getTime()) && time.getTime() > windowEnd.getTime() - 5 * 60 * 1000) {
+		if (!playbackWindowEnd) return;
+		// Advance the window when within 5 minutes of its end
+		if (time.getTime() > playbackWindowEnd.getTime() - 5 * 60 * 1000) {
 			const newStart = new Date(time.getTime() - 30 * 60 * 1000);
 			const newEnd = new Date(time.getTime() + 30 * 60 * 1000);
+			playbackWindowStart = newStart;
+			playbackWindowEnd = newEnd;
 			hlsSrc = api.getPlaylistUrl(selectedProfileId, newStart.toISOString(), newEnd.toISOString());
 		}
 	}
@@ -128,14 +131,8 @@
 
 	function handleProfileChange(profileId: number) {
 		selectedProfileId = profileId;
-		if (mode === 'recording' && hlsSrc && selectedProfileId) {
-			const src = hlsSrc;
-			const params = new URL(src, window.location.origin).searchParams;
-			const start = params.get('start') ?? '';
-			const end = params.get('end') ?? '';
-			if (start && end) {
-				hlsSrc = api.getPlaylistUrl(profileId, start, end);
-			}
+		if (mode === 'recording' && playbackWindowStart && playbackWindowEnd && selectedProfileId) {
+			hlsSrc = api.getPlaylistUrl(profileId, playbackWindowStart.toISOString(), playbackWindowEnd.toISOString());
 		}
 	}
 </script>
@@ -189,7 +186,7 @@
 		</div>
 
 		<!-- Video Player -->
-		{#if (mode === 'live' && liveWsUrl) || (mode === 'recording' && hlsSrc)}
+		{#if mode === 'live' || (mode === 'recording' && hlsSrc)}
 			<UnifiedPlayer
 				{mode}
 				wsUrl={liveWsUrl ?? undefined}
@@ -202,11 +199,11 @@
 		{:else}
 			<div class="flex aspect-video w-full items-center justify-center overflow-hidden rounded-lg bg-black">
 				<div class="text-center">
-					<p class="text-lg font-medium text-gray-400">No Recordings</p>
+					<p class="text-lg font-medium text-gray-400">No Recording Selected</p>
 					<p class="mt-1 text-sm text-gray-500">
 						{recordingProfiles.length === 0
-							? 'This camera has no recorded footage yet. Enable recording in profile settings to start.'
-							: 'Select a time on the timeline below to start playback.'}
+							? 'Enable recording in profile settings to record footage.'
+							: 'Click a point on the timeline below to start playback.'}
 					</p>
 				</div>
 			</div>

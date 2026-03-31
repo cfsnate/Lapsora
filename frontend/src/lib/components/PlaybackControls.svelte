@@ -35,22 +35,21 @@
 
 	<div class="flex-1"></div>
 
-	{#if !isLive}
-		<div class="flex items-center gap-1">
-			{#each speeds as speed}
-				<button
-					onclick={() => onSpeedChange(speed)}
-					class="rounded-md px-2 py-1 text-xs {playbackRate === speed ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'}"
-				>
-					{speed}×
-				</button>
-			{/each}
-		</div>
-	{/if}
+	<div class="flex items-center gap-1">
+		{#each speeds as speed}
+			<button
+				onclick={() => onSpeedChange(speed)}
+				disabled={isLive}
+				class="rounded-md px-2 py-1 text-xs {isLive ? 'cursor-not-allowed opacity-40 bg-gray-800 text-gray-600' : playbackRate === speed ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'}"
+			>
+				{speed}×
+			</button>
+		{/each}
+	</div>
 
 	{#if hasSelection && onExportClick}
 		<button onclick={onExportClick}
-			class="ml-auto flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-500 transition-colors">
+			class="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-500 transition-colors">
 			<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M14.121 14.121L7.05 9.88m0 4.242l7.071-4.243M21 3l-9 9m0 0l-3 3m3-3l3 3M3 3l9 9" />
 			</svg>
