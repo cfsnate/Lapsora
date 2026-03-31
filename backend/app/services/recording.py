@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 from app.config import decrypt, settings
 from app.database import SessionLocal
 from app.models import Profile, RecordingSegment, Setting, Stream
+from app.services.events import emit
 from app.services.go2rtc import get_go2rtc_url
 from app.services.notifications import _sse_lock, sse_queues
 
@@ -175,6 +176,17 @@ class RecordingProcess:
         self.started_at = datetime.now(UTC)
         self._watchdog_task = asyncio.create_task(self._watchdog())
         self._wait_task = asyncio.create_task(self._wait_for_exit())
+        
+        # Emit recording started event
+        profile_title = f"Profile {self.profile_id}"
+        await emit(
+            "recording_started",
+            f"Recording started for {profile_title}",
+            f"FFmpeg recording process started for profile {self.profile_id} at {self.started_at.isoformat()}",
+            "info",
+            {"profile_id": self.profile_id, "stream_id": self.stream_id}
+        )
+        
         await self._emit_status_event()
 
     async def _stop_ffmpeg(self) -> None:
@@ -192,6 +204,19 @@ class RecordingProcess:
         if self._wait_task is not None:
             self._wait_task.cancel()
             self._wait_task = None
+        
+        # Emit recording stopped event
+        profile_title = f"Profile {self.profile_id}"
+        stopped_at = datetime.now(UTC)
+        duration = (stopped_at - self.started_at).total_seconds() if self.started_at else 0
+        await emit(
+            "recording_stopped",
+            f"Recording stopped for {profile_title}",
+            f"FFmpeg recording process stopped for profile {self.profile_id} after {duration:.1f} seconds",
+            "info",
+            {"profile_id": self.profile_id, "stream_id": self.stream_id, "duration_seconds": duration}
+        )
+        
         await self._emit_status_event()
 
     async def _wait_for_exit(self) -> None:
@@ -202,6 +227,25 @@ class RecordingProcess:
         if self.state == "stopped":
             return
         self.state = "error"
+        
+        # Emit recording failed event
+        profile_title = f"Profile {self.profile_id}"
+        failed_at = datetime.now(UTC)
+        duration = (failed_at - self.started_at).total_seconds() if self.started_at else 0
+        await emit(
+            "recording_failed",
+            f"Recording failed for {profile_title}",
+            f"FFmpeg recording process failed for profile {self.profile_id} with exit code {returncode} after {duration:.1f} seconds. Retry attempt {self.retry_count + 1}.",
+            "error",
+            {
+                "profile_id": self.profile_id, 
+                "stream_id": self.stream_id, 
+                "exit_code": returncode,
+                "duration_seconds": duration,
+                "retry_count": self.retry_count + 1
+            }
+        )
+        
         await self._emit_status_event()
         delay = BACKOFF_SCHEDULE[min(self.retry_count, len(BACKOFF_SCHEDULE) - 1)]
         self.retry_count += 1
