@@ -4,7 +4,7 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 	import { api } from '$lib/api';
-	import type { Notification } from '$lib/types';
+	import type { Notification, AuthUser } from '$lib/types';
 	import { setUse24h } from '$lib/utils';
 	import NotificationBell from '$lib/components/NotificationBell.svelte';
 	import NotificationToast from '$lib/components/NotificationToast.svelte';
@@ -16,6 +16,8 @@
 	let toastCounter = $state(0);
 	let setupChecked = $state(false);
 	let setupRequired = $state(false);
+	let authChecked = $state(false);
+	let authUser = $state<AuthUser | null>(null);
 
 	const navItems = [
 		{ href: '/', label: 'Dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1' },
@@ -50,10 +52,25 @@
 				goto('/setup' as string);
 			} else if (!status.setup_required && (currentPath as string) === '/setup') {
 				goto('/');
+			} else if (!status.setup_required) {
+				// Setup is done — check auth
+				api.getMe().then((user) => {
+					authUser = user;
+					authChecked = true;
+					if ((currentPath as string) === '/login') {
+						goto('/');
+					}
+				}).catch(() => {
+					authChecked = true;
+					if ((currentPath as string) !== '/login') {
+						goto('/login');
+					}
+				});
 			}
 		}).catch(() => {
 			// If setup-status fetch fails, allow the app to proceed normally
 			setupChecked = true;
+			authChecked = true;
 		});
 
 		loadNotifications();
@@ -106,6 +123,12 @@
 	<div class="flex h-screen items-center justify-center bg-gray-950"></div>
 {:else if setupRequired}
 	<!-- Setup wizard — render without nav shell -->
+	{@render children()}
+{:else if !authChecked}
+	<!-- Blank screen while checking auth — prevents nav flash before redirect -->
+	<div class="flex h-screen items-center justify-center bg-gray-950"></div>
+{:else if !authUser}
+	<!-- Login page — render without nav shell -->
 	{@render children()}
 {:else}
 	<div class="flex h-screen bg-gray-950 text-gray-100">

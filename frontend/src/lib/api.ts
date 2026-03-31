@@ -1,10 +1,11 @@
-import type { Stream, StreamCreate, StreamUpdate, Profile, ProfileCreate, ProfileUpdate, ProfileTemplate, ProfileTemplateCreate, Capture, Timelapse, TimelapseGenerate, TimelapseSchedule, TimelapseScheduleCreate, TimelapseScheduleUpdate, CleanupSchedule, CleanupScheduleCreate, CleanupScheduleUpdate, TestResult, StorageStats, Notification, NotificationURL, HealthConfig, NotificationEventsConfig, LocationConfig, CaptureGapConfig, TimeFormatConfig, StatsSummary, StorageTrendPoint, CaptureActivityPoint, ProfileStoragePoint, Go2rtcConfig, Go2rtcStreamInfo, TimelapseSummary, RecordingStatus, RecordingStorageStats, RecordingRetentionConfig, PlaybackAvailabilityRange, ClipExport, ClipExportCreate, SetupStatus, SetupCreate } from './types';
+import type { Stream, StreamCreate, StreamUpdate, Profile, ProfileCreate, ProfileUpdate, ProfileTemplate, ProfileTemplateCreate, Capture, Timelapse, TimelapseGenerate, TimelapseSchedule, TimelapseScheduleCreate, TimelapseScheduleUpdate, CleanupSchedule, CleanupScheduleCreate, CleanupScheduleUpdate, TestResult, StorageStats, Notification, NotificationURL, HealthConfig, NotificationEventsConfig, LocationConfig, CaptureGapConfig, TimeFormatConfig, StatsSummary, StorageTrendPoint, CaptureActivityPoint, ProfileStoragePoint, Go2rtcConfig, Go2rtcStreamInfo, TimelapseSummary, RecordingStatus, RecordingStorageStats, RecordingRetentionConfig, PlaybackAvailabilityRange, ClipExport, ClipExportCreate, SetupStatus, SetupCreate, AuthUser, LoginCredentials } from './types';
 
 const BASE = '/api';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
 	const res = await fetch(`${BASE}${path}`, {
 		headers: { 'Content-Type': 'application/json', ...options?.headers },
+		credentials: 'include' as RequestCredentials,
 		...options
 	});
 	if (!res.ok) {
@@ -193,4 +194,7 @@ export const api = {
 	// Auth / Setup
 	getSetupStatus: () => request<SetupStatus>('/auth/setup-status'),
 	createAdmin: (data: SetupCreate) => request<{ id: number; username: string; display_name: string; email: string | null; role: string; created_at: string }>('/auth/setup', { method: 'POST', body: JSON.stringify(data) }),
+	login: (data: LoginCredentials) => request<AuthUser>('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
+	logout: () => request<{ status: string }>('/auth/logout', { method: 'POST' }),
+	getMe: () => request<AuthUser>('/auth/me'),
 };

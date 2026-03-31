@@ -493,3 +493,19 @@ export interface SetupCreate {
 	password: string;
 	email?: string;
 }
+
+export interface AuthUser {
+	id: number;
+	username: string;
+	display_name: string;
+	email: string | null;
+	role: string;
+	is_active: boolean;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface LoginCredentials {
+	username: string;
+	password: string;
+}
