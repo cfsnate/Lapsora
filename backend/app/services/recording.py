@@ -151,7 +151,6 @@ class RecordingProcess:
             "-loglevel", "warning",
             "-rtsp_transport", "tcp",
             "-use_wallclock_as_timestamps", "1",
-            "-timeout", "5000000",
             "-stimeout", "5000000",
             "-i", self.rtsp_url,
             "-c", "copy",
