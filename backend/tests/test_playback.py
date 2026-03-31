@@ -73,12 +73,12 @@ def test_generate_playlist_empty(db):
     assert result == ""
 
 
-def test_playlist_endpoint(client, db):
+def test_playlist_endpoint(authed_client, db):
     profile = _create_profile(db)
     _create_segment(db, profile.id, datetime(2026, 3, 30, 10, 0), duration=300.0)
     _create_segment(db, profile.id, datetime(2026, 3, 30, 10, 5), duration=300.0)
 
-    resp = client.get(
+    resp = authed_client.get(
         f"/api/playback/{profile.id}/playlist",
         params={"start": "2026-03-30T10:00:00", "end": "2026-03-30T11:00:00"},
     )
@@ -88,31 +88,29 @@ def test_playlist_endpoint(client, db):
     assert "#EXTM3U" in resp.text
 
 
-def test_playlist_endpoint_no_data(client, db):
+def test_playlist_endpoint_no_data(authed_client, db):
     profile = _create_profile(db)
 
-    resp = client.get(
+    resp = authed_client.get(
         f"/api/playback/{profile.id}/playlist",
         params={"start": "2026-03-30T10:00:00", "end": "2026-03-30T11:00:00"},
     )
 
-    # Empty range returns a valid empty VOD playlist (200) rather than 404,
-    # so HLS.js doesn't fatal on the response.
     assert resp.status_code == 200
     assert "#EXTM3U" in resp.text
     assert "#EXT-X-ENDLIST" in resp.text
 
 
-def test_segment_endpoint_file_missing(client, db):
+def test_segment_endpoint_file_missing(authed_client, db):
     profile = _create_profile(db)
     seg = _create_segment(db, profile.id, datetime(2026, 3, 30, 10, 0))
 
-    resp = client.get(f"/api/playback/segment/{seg.id}")
+    resp = authed_client.get(f"/api/playback/segment/{seg.id}")
     assert resp.status_code == 404
     assert "not found on disk" in resp.json()["detail"]
 
 
-def test_segment_endpoint_file_exists(client, db, tmp_path):
+def test_segment_endpoint_file_exists(authed_client, db, tmp_path):
     profile = _create_profile(db)
     seg = _create_segment(db, profile.id, datetime(2026, 3, 30, 10, 0), file_path="recordings/test.ts")
 
@@ -122,44 +120,44 @@ def test_segment_endpoint_file_exists(client, db, tmp_path):
 
     with patch("app.routers.playback.settings") as mock_settings:
         mock_settings.DATA_DIR = str(tmp_path)
-        resp = client.get(f"/api/playback/segment/{seg.id}")
+        resp = authed_client.get(f"/api/playback/segment/{seg.id}")
 
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "video/mp2t"
 
 
-def test_segment_not_found(client, db):
-    resp = client.get("/api/playback/segment/99999")
+def test_segment_not_found(authed_client, db):
+    resp = authed_client.get("/api/playback/segment/99999")
     assert resp.status_code == 404
 
 
-def test_availability_basic(client, db):
+def test_availability_basic(authed_client, db):
     profile = _create_profile(db)
     base = datetime(2026, 3, 30, 10, 0)
     _create_segment(db, profile.id, base, duration=300.0)
     _create_segment(db, profile.id, base + timedelta(seconds=300), duration=300.0)
     _create_segment(db, profile.id, base + timedelta(seconds=600), duration=300.0)
 
-    resp = client.get(
+    resp = authed_client.get(
         f"/api/playback/{profile.id}/availability",
         params={"date": "2026-03-30"},
     )
 
     assert resp.status_code == 200
     data = resp.json()
-    assert len(data) == 1  # contiguous segments merge into one range
+    assert len(data) == 1
 
 
-def test_availability_with_gaps(client, db):
+def test_availability_with_gaps(authed_client, db):
     profile = _create_profile(db)
     _create_segment(db, profile.id, datetime(2026, 3, 30, 10, 0), duration=300.0)
     _create_segment(db, profile.id, datetime(2026, 3, 30, 14, 0), duration=300.0)
 
-    resp = client.get(
+    resp = authed_client.get(
         f"/api/playback/{profile.id}/availability",
         params={"date": "2026-03-30"},
     )
 
     assert resp.status_code == 200
     data = resp.json()
-    assert len(data) == 2  # gap separates into two ranges
+    assert len(data) == 2

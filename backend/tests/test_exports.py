@@ -58,12 +58,12 @@ def _create_export(
 
 
 @patch("app.routers.exports.enqueue_export", new_callable=AsyncMock)
-def test_create_export(mock_enqueue, client, db):
+def test_create_export(mock_enqueue, authed_client, db):
     profile = _create_profile(db)
     db.commit()
     mock_enqueue.return_value = {"clip_export_id": 1, "position": 1}
 
-    resp = client.post("/api/exports/", json={
+    resp = authed_client.post("/api/exports/", json={
         "profile_id": profile.id,
         "start_time": "2026-01-01T10:00:00Z",
         "end_time": "2026-01-01T10:30:00Z",
@@ -79,14 +79,14 @@ def test_create_export(mock_enqueue, client, db):
 
 
 @patch("app.routers.exports.enqueue_export", new_callable=AsyncMock)
-def test_list_exports(mock_enqueue, client, db):
+def test_list_exports(mock_enqueue, authed_client, db):
     profile = _create_profile(db)
     now = datetime.now(UTC)
     _create_export(db, profile.id, now - timedelta(hours=2), now - timedelta(hours=1), status="completed")
     _create_export(db, profile.id, now - timedelta(hours=1), now, status="pending")
     db.commit()
 
-    resp = client.get("/api/exports/")
+    resp = authed_client.get("/api/exports/")
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 2
@@ -94,7 +94,7 @@ def test_list_exports(mock_enqueue, client, db):
 
 
 @patch("app.routers.exports.enqueue_export", new_callable=AsyncMock)
-def test_list_exports_filter_status(mock_enqueue, client, db):
+def test_list_exports_filter_status(mock_enqueue, authed_client, db):
     profile = _create_profile(db)
     now = datetime.now(UTC)
     _create_export(db, profile.id, now - timedelta(hours=2), now - timedelta(hours=1), status="completed")
@@ -102,7 +102,7 @@ def test_list_exports_filter_status(mock_enqueue, client, db):
     _create_export(db, profile.id, now, now + timedelta(hours=1), status="completed")
     db.commit()
 
-    resp = client.get("/api/exports/?status=completed")
+    resp = authed_client.get("/api/exports/?status=completed")
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 2
@@ -183,7 +183,7 @@ def test_segment_overlap_query(db):
 
 
 @patch("app.routers.exports.enqueue_export", new_callable=AsyncMock)
-def test_download_completed_export(mock_enqueue, client, db):
+def test_download_completed_export(mock_enqueue, authed_client, db):
     profile = _create_profile(db)
     now = datetime.now(UTC)
     export = _create_export(
@@ -195,24 +195,24 @@ def test_download_completed_export(mock_enqueue, client, db):
     with patch("os.path.isfile", return_value=True), \
          patch("app.routers.exports.FileResponse", return_value=MagicMock(status_code=200)) as mock_fr:
         mock_fr.return_value.status_code = 200
-        resp = client.get(f"/api/exports/{export.id}/download")
+        resp = authed_client.get(f"/api/exports/{export.id}/download")
 
     assert resp.status_code == 200
 
 
 @patch("app.routers.exports.enqueue_export", new_callable=AsyncMock)
-def test_download_pending_export_404(mock_enqueue, client, db):
+def test_download_pending_export_404(mock_enqueue, authed_client, db):
     profile = _create_profile(db)
     now = datetime.now(UTC)
     export = _create_export(db, profile.id, now, now + timedelta(hours=1), status="pending")
     db.commit()
 
-    resp = client.get(f"/api/exports/{export.id}/download")
+    resp = authed_client.get(f"/api/exports/{export.id}/download")
     assert resp.status_code == 404
 
 
 @patch("app.routers.exports.enqueue_export", new_callable=AsyncMock)
-def test_delete_export(mock_enqueue, client, db):
+def test_delete_export(mock_enqueue, authed_client, db):
     profile = _create_profile(db)
     now = datetime.now(UTC)
     export = _create_export(
@@ -224,7 +224,7 @@ def test_delete_export(mock_enqueue, client, db):
 
     with patch("os.path.isfile", return_value=True), \
          patch("os.unlink") as mock_unlink:
-        resp = client.delete(f"/api/exports/{export_id}")
+        resp = authed_client.delete(f"/api/exports/{export_id}")
 
     assert resp.status_code == 204
     assert db.query(ClipExport).get(export_id) is None

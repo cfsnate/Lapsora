@@ -65,7 +65,7 @@ class TestRecordingNotifications(unittest.TestCase):
     def test_recording_stopped_event_emission(self):
         """Test that recording_stopped event is emitted when RecordingProcess stops."""
         async def run_test():
-            with patch('app.services.events.emit', new_callable=AsyncMock) as mock_emit:
+            with patch('app.services.recording.emit', new_callable=AsyncMock) as mock_emit:
                 rp = RecordingProcess(
                     profile_id=2,
                     stream_id=20,
@@ -94,7 +94,7 @@ class TestRecordingNotifications(unittest.TestCase):
                 self.assertIn("FFmpeg recording process stopped for profile 2 after", call_args[2])
                 self.assertEqual(call_args[3], "info")
                 
-                event_data = mock_emit.call_args[1]['data']
+                event_data = call_args[4]
                 self.assertEqual(event_data['profile_id'], 2)
                 self.assertEqual(event_data['stream_id'], 20)
                 self.assertIn('duration_seconds', event_data)
@@ -105,7 +105,7 @@ class TestRecordingNotifications(unittest.TestCase):
     def test_recording_failed_event_emission(self):
         """Test that recording_failed event is emitted when FFmpeg process exits with error."""
         async def run_test():
-            with patch('app.services.events.emit', new_callable=AsyncMock) as mock_emit:
+            with patch('app.services.recording.emit', new_callable=AsyncMock) as mock_emit:
                 rp = RecordingProcess(
                     profile_id=3,
                     stream_id=30,
@@ -132,7 +132,7 @@ class TestRecordingNotifications(unittest.TestCase):
                 self.assertIn("FFmpeg recording process failed for profile 3 with exit code 1", call_args[2])
                 self.assertEqual(call_args[3], "error")
                 
-                event_data = mock_emit.call_args[1]['data']
+                event_data = call_args[4]
                 self.assertEqual(event_data['profile_id'], 3)
                 self.assertEqual(event_data['stream_id'], 30)
                 self.assertEqual(event_data['exit_code'], 1)
@@ -249,7 +249,7 @@ class TestNotificationEventHandling(unittest.TestCase):
             
             try:
                 with patch('app.services.notifications.sse_queues', []):
-                    with patch('app.database.SessionLocal', return_value=db):
+                    with patch('app.services.notifications.SessionLocal', return_value=db):
                         await handle_event(
                             "recording_started",
                             "Recording Started",
@@ -286,7 +286,7 @@ class TestNotificationEventHandling(unittest.TestCase):
             
             try:
                 with patch('app.services.notifications.sse_queues', []):
-                    with patch('app.database.SessionLocal', return_value=db):
+                    with patch('app.services.notifications.SessionLocal', return_value=db):
                         await handle_event(
                             "recording_failed",
                             "Recording Failed",
@@ -326,7 +326,7 @@ class TestNotificationEventHandling(unittest.TestCase):
                 
                 with patch('app.services.notifications.sse_queues', sse_queues):
                     with patch('app.services.notifications._sse_lock'):
-                        with patch('app.database.SessionLocal', return_value=db):
+                        with patch('app.services.notifications.SessionLocal', return_value=db):
                             await handle_event(
                                 "recording_stopped",
                                 "Recording Stopped",
@@ -352,7 +352,7 @@ class TestNotificationEventHandling(unittest.TestCase):
             # Create a mock db session
             from sqlalchemy import create_engine
             from sqlalchemy.orm import sessionmaker
-            from app.models import Base
+            from app.models import Base, NotificationURL
             
             engine = create_engine("sqlite:///:memory:")
             Base.metadata.create_all(bind=engine)
@@ -365,26 +365,24 @@ class TestNotificationEventHandling(unittest.TestCase):
                 custom_toggles['recording_failed'] = True
                 setting = Setting(key="notification_events", value=json.dumps(custom_toggles))
                 db.add(setting)
+                # Add a notification URL so Apprise path is reached
+                from app.config import encrypt
+                db.add(NotificationURL(label="test", url=encrypt("json://localhost"), enabled=True))
                 db.commit()
                 
                 with patch('app.services.notifications.sse_queues', []):
-                    with patch('app.database.SessionLocal', return_value=db):
-                        with patch('apprise.Apprise') as mock_apprise_class:
-                            mock_apprise = MagicMock()
-                            mock_apprise_class.return_value = mock_apprise
-                            mock_apprise.__len__ = Mock(return_value=1)  # Simulate URLs configured
-                            
-                            with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
-                                await handle_event(
-                                    "recording_failed",
-                                    "Recording Failed",
-                                    "Critical recording failure",
-                                    "error",
-                                    {"profile_id": 4}
-                                )
-                            
-                            # Verify Apprise notification was attempted
-                            mock_to_thread.assert_called_once()
+                    with patch('app.services.notifications.SessionLocal', return_value=db):
+                        with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
+                            await handle_event(
+                                "recording_failed",
+                                "Recording Failed",
+                                "Critical recording failure",
+                                "error",
+                                {"profile_id": 4}
+                            )
+                        
+                        # Verify Apprise notification was attempted
+                        mock_to_thread.assert_called_once()
             finally:
                 db.close()
         
@@ -412,7 +410,7 @@ class TestNotificationEventHandling(unittest.TestCase):
                 db.commit()
                 
                 with patch('app.services.notifications.sse_queues', []):
-                    with patch('app.database.SessionLocal', return_value=db):
+                    with patch('app.services.notifications.SessionLocal', return_value=db):
                         with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
                             await handle_event(
                                 "recording_started",
@@ -464,11 +462,11 @@ class TestRecordingManagerNotifications(unittest.TestCase):
                 
                 manager = RecordingManager()
                 
-                with patch('app.services.events.emit', new_callable=AsyncMock) as mock_emit:
+                with patch('app.services.recording.emit', new_callable=AsyncMock) as mock_emit:
                     with patch('app.services.recording.resolve_recording_url', return_value="rtsp://test.local"):
                         with patch('app.services.recording._is_within_recording_window', return_value=True):
                             with patch.object(RecordingProcess, '_start_ffmpeg', new_callable=AsyncMock):
-                                with patch('app.database.SessionLocal', return_value=db):
+                                with patch('app.services.recording.SessionLocal', return_value=db):
                                     await manager.start(profile.id)
                 
                 # Verify that emit was called (should be called by RecordingProcess._start_ffmpeg)

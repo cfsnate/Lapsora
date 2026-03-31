@@ -11,13 +11,13 @@ def _create_stream_and_profile(client):
     return sid, pid
 
 
-def test_list_captures_empty(client):
-    _sid, pid = _create_stream_and_profile(client)
-    resp = client.get(f"/api/profiles/{pid}/captures")
+def test_list_captures_empty(authed_client):
+    _sid, pid = _create_stream_and_profile(authed_client)
+    resp = authed_client.get(f"/api/profiles/{pid}/captures")
     assert resp.status_code == 200
     assert resp.json() == []
 
 
-def test_get_nonexistent_capture_image(client):
-    resp = client.get("/api/captures/9999/image")
+def test_get_nonexistent_capture_image(authed_client):
+    resp = authed_client.get("/api/captures/9999/image")
     assert resp.status_code == 404

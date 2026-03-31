@@ -48,11 +48,12 @@ def _create_segment(db, profile_id, start_time, file_path, file_size=1000, prote
 
 def test_cleanup_deletes_expired_segments(db):
     profile = _create_profile(db, recording_retention_days=7)
+    profile_id = profile.id
     now = datetime.now(UTC)
 
-    _create_segment(db, profile.id, now - timedelta(days=10), "recordings/1/old.ts")
-    _create_segment(db, profile.id, now - timedelta(days=5), "recordings/1/mid.ts")
-    _create_segment(db, profile.id, now - timedelta(days=1), "recordings/1/new.ts")
+    _create_segment(db, profile_id, now - timedelta(days=10), "recordings/1/old.ts")
+    _create_segment(db, profile_id, now - timedelta(days=5), "recordings/1/mid.ts")
+    _create_segment(db, profile_id, now - timedelta(days=1), "recordings/1/new.ts")
     db.commit()
 
     from app.services.retention import run_recording_cleanup
@@ -63,11 +64,11 @@ def test_cleanup_deletes_expired_segments(db):
          patch("os.path.isdir", return_value=False), \
          patch("app.services.retention.settings") as mock_settings:
         mock_settings.DATA_DIR = "/data"
-        result = asyncio.run(run_recording_cleanup(profile.id, 7))
+        result = asyncio.run(run_recording_cleanup(profile_id, 7))
 
     assert result["segments_deleted"] == 1
     assert mock_unlink.call_count == 1
-    remaining = db.query(RecordingSegment).filter(RecordingSegment.profile_id == profile.id).count()
+    remaining = db.query(RecordingSegment).filter(RecordingSegment.profile_id == profile_id).count()
     assert remaining == 2
 
 
@@ -91,10 +92,11 @@ def test_effective_retention_override(db):
 
 def test_batch_deletion(db):
     profile = _create_profile(db)
+    profile_id = profile.id
     now = datetime.now(UTC)
 
     for i in range(600):
-        _create_segment(db, profile.id, now - timedelta(days=30, hours=i), f"recordings/1/seg_{i}.ts")
+        _create_segment(db, profile_id, now - timedelta(days=30, hours=i), f"recordings/1/seg_{i}.ts")
     db.commit()
 
     from app.services.retention import run_recording_cleanup
@@ -113,7 +115,7 @@ def test_batch_deletion(db):
          patch("app.services.retention.settings") as mock_settings, \
          patch.object(db, "commit", side_effect=tracking_commit):
         mock_settings.DATA_DIR = "/data"
-        result = asyncio.run(run_recording_cleanup(profile.id, 1))
+        result = asyncio.run(run_recording_cleanup(profile_id, 1))
 
     assert result["segments_deleted"] == 600
     assert len(commit_calls) >= 2
@@ -126,12 +128,18 @@ def test_emergency_cleanup_oldest_first(db):
     seg_old = _create_segment(db, profile.id, now - timedelta(days=10), "recordings/1/old.ts", file_size=5000)
     seg_mid = _create_segment(db, profile.id, now - timedelta(days=5), "recordings/1/mid.ts", file_size=5000)
     seg_new = _create_segment(db, profile.id, now - timedelta(days=1), "recordings/1/new.ts", file_size=5000)
+    seg_new_id = seg_new.id
     db.commit()
 
+    # The emergency cleanup deletes in batches, checking disk after each batch.
+    # With batch_size=500 and only 3 segments, one batch deletes everything.
+    # To test that oldest are deleted first, we verify deletion order by patching
+    # the batch size to 1 so disk is rechecked after each segment.
     call_count = [0]
     def mock_disk_usage(path):
         call_count[0] += 1
-        if call_count[0] <= 1:
+        if call_count[0] <= 2:
+            # First two checks: over threshold (before and after deleting oldest)
             return MagicMock(total=100_000, used=95_000, free=5_000)
         return MagicMock(total=100_000, used=75_000, free=25_000)
 
@@ -141,21 +149,24 @@ def test_emergency_cleanup_oldest_first(db):
          patch("shutil.disk_usage", side_effect=mock_disk_usage), \
          patch("os.path.exists", return_value=True), \
          patch("os.unlink"), \
+         patch("app.services.retention.RECORDING_CLEANUP_BATCH_SIZE", 1), \
          patch("app.services.retention.settings") as mock_settings:
         mock_settings.DATA_DIR = "/data"
         result = asyncio.run(run_emergency_recording_cleanup(target_pct=80))
 
     assert result["segments_deleted"] > 0
     remaining_ids = [s.id for s in db.query(RecordingSegment).all()]
-    assert seg_new.id in remaining_ids
+    assert seg_new_id in remaining_ids
 
 
 def test_orphan_cleanup(db):
     profile = _create_profile(db)
+    profile_id = profile.id
     now = datetime.now(UTC)
 
-    _create_segment(db, profile.id, now - timedelta(days=5), "recordings/1/exists.ts")
-    _create_segment(db, profile.id, now - timedelta(days=5), "recordings/1/missing.ts")
+    # Use recent segments so they won't be expired (retention_days=365)
+    _create_segment(db, profile_id, now - timedelta(hours=1), "recordings/1/exists.ts")
+    _create_segment(db, profile_id, now - timedelta(hours=1), "recordings/1/missing.ts")
     db.commit()
 
     def selective_exists(path):
@@ -169,17 +180,18 @@ def test_orphan_cleanup(db):
          patch("os.path.isdir", return_value=False), \
          patch("app.services.retention.settings") as mock_settings:
         mock_settings.DATA_DIR = "/data"
-        result = asyncio.run(run_recording_cleanup(profile.id, 0))
+        result = asyncio.run(run_recording_cleanup(profile_id, 365))
 
     assert result["orphan_records_cleaned"] >= 1
 
 
 def test_protected_segments_exempt(db):
     profile = _create_profile(db, recording_retention_days=1)
+    profile_id = profile.id
     now = datetime.now(UTC)
 
-    _create_segment(db, profile.id, now - timedelta(days=5), "recordings/1/protected.ts", protected=True)
-    _create_segment(db, profile.id, now - timedelta(days=5), "recordings/1/unprotected.ts", protected=False)
+    _create_segment(db, profile_id, now - timedelta(days=5), "recordings/1/protected.ts", protected=True)
+    _create_segment(db, profile_id, now - timedelta(days=5), "recordings/1/unprotected.ts", protected=False)
     db.commit()
 
     from app.services.retention import run_recording_cleanup
@@ -190,15 +202,15 @@ def test_protected_segments_exempt(db):
          patch("os.path.isdir", return_value=False), \
          patch("app.services.retention.settings") as mock_settings:
         mock_settings.DATA_DIR = "/data"
-        result = asyncio.run(run_recording_cleanup(profile.id, 1))
+        result = asyncio.run(run_recording_cleanup(profile_id, 1))
 
     assert result["segments_deleted"] == 1
-    remaining = db.query(RecordingSegment).filter(RecordingSegment.profile_id == profile.id).all()
+    remaining = db.query(RecordingSegment).filter(RecordingSegment.profile_id == profile_id).all()
     assert len(remaining) == 1
     assert remaining[0].protected is True
 
 
-def test_protect_time_range(client, db):
+def test_protect_time_range(authed_client, db):
     profile = _create_profile(db)
 
     seg_a = _create_segment(
@@ -218,7 +230,7 @@ def test_protect_time_range(client, db):
     )
     db.commit()
 
-    resp = client.post(
+    resp = authed_client.post(
         f"/api/recording/{profile.id}/protect",
         json={"start_time": "2026-01-01T10:45:00Z", "end_time": "2026-01-01T12:15:00Z"},
     )
@@ -234,7 +246,7 @@ def test_protect_time_range(client, db):
     assert seg_c.protected is True
 
 
-def test_unprotect_time_range(client, db):
+def test_unprotect_time_range(authed_client, db):
     profile = _create_profile(db)
 
     seg1 = _create_segment(
@@ -251,7 +263,7 @@ def test_unprotect_time_range(client, db):
     )
     db.commit()
 
-    resp = client.post(
+    resp = authed_client.post(
         f"/api/recording/{profile.id}/unprotect",
         json={"start_time": "2026-01-01T09:00:00Z", "end_time": "2026-01-01T12:00:00Z"},
     )
@@ -268,11 +280,13 @@ def test_unprotect_time_range(client, db):
 def test_recording_storage_stats(db):
     p1 = _create_profile(db, name="Profile A")
     p2 = _create_profile(db, name="Profile B")
+    p1_id = p1.id
+    p2_id = p2.id
     now = datetime.now(UTC)
 
-    _create_segment(db, p1.id, now - timedelta(days=5), "recordings/1/a.ts", file_size=2000)
-    _create_segment(db, p1.id, now - timedelta(days=1), "recordings/1/b.ts", file_size=3000, protected=True)
-    _create_segment(db, p2.id, now - timedelta(days=3), "recordings/2/c.ts", file_size=4000)
+    _create_segment(db, p1_id, now - timedelta(days=5), "recordings/1/a.ts", file_size=2000)
+    _create_segment(db, p1_id, now - timedelta(days=1), "recordings/1/b.ts", file_size=3000, protected=True)
+    _create_segment(db, p2_id, now - timedelta(days=3), "recordings/2/c.ts", file_size=4000)
     db.commit()
 
     from app.services.retention import get_recording_storage_stats
@@ -284,14 +298,14 @@ def test_recording_storage_stats(db):
     assert stats["total_bytes"] == 9000
     assert len(stats["profiles"]) == 2
 
-    p1_stats = next(p for p in stats["profiles"] if p["profile_id"] == p1.id)
+    p1_stats = next(p for p in stats["profiles"] if p["profile_id"] == p1_id)
     assert p1_stats["segment_count"] == 2
     assert p1_stats["total_bytes"] == 5000
     assert p1_stats["protected_count"] == 1
     assert p1_stats["oldest_recording"] is not None
     assert p1_stats["newest_recording"] is not None
 
-    p2_stats = next(p for p in stats["profiles"] if p["profile_id"] == p2.id)
+    p2_stats = next(p for p in stats["profiles"] if p["profile_id"] == p2_id)
     assert p2_stats["segment_count"] == 1
     assert p2_stats["total_bytes"] == 4000
     assert p2_stats["protected_count"] == 0

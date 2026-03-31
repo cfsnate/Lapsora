@@ -8,6 +8,13 @@ from sqlalchemy.pool import StaticPool
 from app.database import get_db
 from app.models import Base
 
+_ADMIN_SETUP = {
+    "username": "admin",
+    "display_name": "Admin User",
+    "password": "securepass123",
+}
+_ADMIN_LOGIN = {"username": "admin", "password": "securepass123"}
+
 
 @pytest.fixture
 def db():
@@ -45,3 +52,13 @@ def client(db):
     with TestClient(app, raise_server_exceptions=False) as c:
         yield c
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def authed_client(client):
+    """A test client that is already authenticated as admin."""
+    resp = client.post("/api/auth/setup", json=_ADMIN_SETUP)
+    assert resp.status_code == 201, f"Setup failed: {resp.json()}"
+    resp = client.post("/api/auth/login", json=_ADMIN_LOGIN)
+    assert resp.status_code == 200, f"Login failed: {resp.json()}"
+    return client
