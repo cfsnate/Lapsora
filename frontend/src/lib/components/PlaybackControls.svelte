@@ -59,7 +59,7 @@
 			<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 002.828 2.828L18 9.828V15h2V5h-10v2h5.172z" />
 			</svg>
-			{clipMode ? 'Cancel' : 'Clip'}
+			{clipMode ? 'Cancel' : 'Clip Export'}
 		</button>
 	{/if}
 
