@@ -139,11 +139,20 @@
 					manifestLoadingMaxRetryTimeout: isLiveHls ? 2000 : 2000,
 					levelLoadingMaxRetry: isLiveHls ? 10 : 2,
 					levelLoadingRetryDelay: isLiveHls ? 500 : 500,
-					// Keep a modest buffer — live view doesn't need 30s
-					maxBufferLength: isLiveHls ? 8 : 30,
-					maxMaxBufferLength: isLiveHls ? 16 : 60,
+					// Progressive loading: start playing as bytes arrive rather than
+					// waiting for the entire segment to download. Critical for large
+					// segments (45-78MB for 300s of 4K).
+					progressive: true,
+					lowLatencyMode: isLiveHls,
+					// Keep buffer modest — seek responsiveness matters more than
+					// deep prebuffering for recorded playback
+					maxBufferLength: isLiveHls ? 8 : 15,
+					maxMaxBufferLength: isLiveHls ? 16 : 30,
+					maxBufferSize: 60 * 1000 * 1000, // 60MB max buffer
 					// For live, start from the live edge
 					liveSyncDurationCount: 2,
+					// Start playback before full segment is loaded
+					startFragPrefetch: true,
 				});
 				instance.loadSource(hlsSrc);
 				instance.attachMedia(videoEl);
