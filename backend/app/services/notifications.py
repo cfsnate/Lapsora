@@ -29,6 +29,10 @@ DEFAULT_EVENT_TOGGLES = {
     "retention_summary": False,
     "low_disk_space": True,
     "capture_gap": True,
+    "recording_started": True,
+    "recording_stopped": True,
+    "recording_failed": True,
+    "clip_export_complete": True,
 }
 
 
