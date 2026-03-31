@@ -148,9 +148,23 @@
 				instance.loadSource(hlsSrc);
 				instance.attachMedia(videoEl);
 
-				instance.on(Hls.Events.MANIFEST_PARSED, () => {
+				instance.on(Hls.Events.MANIFEST_PARSED, (_event, data) => {
+					// An empty VOD playlist (no recordings in range) parses successfully
+					// but has no levels/fragments. Surface this as a distinct state.
+					if (!isLiveHls && data.levels.length === 0) {
+						status = 'error';
+						errorMsg = 'No recordings found in this time range';
+						onError?.('No recordings found in this time range');
+						return;
+					}
 					status = 'ready';
 					onReady?.();
+				});
+				instance.on(Hls.Events.FRAG_LOADED, () => {
+					// First fragment loaded — ensure playing state is set
+					if (status === 'ready') {
+						videoEl?.play().catch(() => {});
+					}
 				});
 				instance.on(Hls.Events.ERROR, (_event, data) => {
 					if (data.fatal) {

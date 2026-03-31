@@ -63,9 +63,21 @@
 	$effect(() => {
 		if (!selectedProfileId) return;
 		const profId = selectedProfileId;
-		api.getAvailability(profId, new Date().toISOString().slice(0, 10), 7)
-			.then((ranges) => { availabilityRanges = ranges; })
-			.catch(() => { availabilityRanges = []; });
+
+		function fetchAvailability() {
+			// Fetch last 7 days of availability. Use UTC date so it aligns with
+			// how the backend stores segment timestamps.
+			const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+			const dateStr = sevenDaysAgo.toISOString().slice(0, 10);
+			api.getAvailability(profId, dateStr, 7)
+				.then((ranges) => { availabilityRanges = ranges; })
+				.catch(() => { availabilityRanges = []; });
+		}
+
+		fetchAvailability();
+		// Poll every 30s so the timeline updates as recordings accumulate
+		const interval = setInterval(fetchAvailability, 30_000);
+		return () => clearInterval(interval);
 	});
 
 	function handleSeek(time: Date) {
