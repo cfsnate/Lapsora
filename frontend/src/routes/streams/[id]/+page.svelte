@@ -425,7 +425,7 @@
 			{#if confirmDelete}
 				<div class="mb-4 flex items-center justify-between rounded-lg border border-red-800 bg-red-950/50 p-3">
 					<p class="text-sm text-gray-300">
-						{replaceMode ? 'Replace' : 'Delete'} <strong class="text-white">{confirmDelete.name}</strong>? All captures, timelapses, and schedules will be permanently removed.
+						{replaceMode ? 'Replace' : 'Delete'} <strong class="text-white">{confirmDelete.name}</strong>? All snapshots, recordings, timelapses, and schedules will be permanently removed.
 					</p>
 					<div class="flex shrink-0 gap-2">
 						<button onclick={() => { confirmDelete = null; replaceMode = false; }} class="rounded px-3 py-1 text-xs font-medium text-gray-400 hover:text-gray-200">Cancel</button>
@@ -503,16 +503,16 @@
 			{/if}
 		</div>
 
-		<!-- Recent Captures -->
+		<!-- Recent Snapshots -->
 		{#if captures.length > 0}
 			<div class="rounded-xl border border-gray-800 bg-gray-900 p-5">
-				<h2 class="mb-3 text-lg font-semibold text-gray-100">Recent Captures</h2>
+				<h2 class="mb-3 text-lg font-semibold text-gray-100">Recent Snapshots</h2>
 				<div class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
 					{#each captures as capture}
 						<div class="relative aspect-video overflow-hidden rounded-lg bg-gray-800">
 							<img
 								src={api.getCaptureImageUrl(capture.id)}
-								alt="Capture {capture.id}"
+								alt="Snapshot {capture.id}"
 								class="h-full w-full object-cover"
 								loading="lazy"
 							/>

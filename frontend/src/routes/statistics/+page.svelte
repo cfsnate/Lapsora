@@ -197,11 +197,11 @@
 		<!-- Summary Cards -->
 		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
 			<div class="rounded-lg border border-gray-800 bg-gray-900 p-4">
-				<p class="text-sm text-gray-400">Total Captures</p>
+				<p class="text-sm text-gray-400">Total Snapshots</p>
 				<p class="mt-1 text-2xl font-bold text-white">{summary?.total_captures.toLocaleString() ?? 0}</p>
 			</div>
 			<div class="rounded-lg border border-gray-800 bg-gray-900 p-4">
-				<p class="text-sm text-gray-400">Avg Captures/Day</p>
+				<p class="text-sm text-gray-400">Avg Snapshots/Day</p>
 				<p class="mt-1 text-2xl font-bold text-white">{summary?.avg_captures_per_day ?? 0}</p>
 			</div>
 			<div class="rounded-lg border border-gray-800 bg-gray-900 p-4">
@@ -232,7 +232,7 @@
 				<h2 class="mb-3 text-lg font-semibold text-white">Disk Usage Breakdown</h2>
 				<div class="mb-4 flex h-6 w-full overflow-hidden rounded-full bg-gray-800">
 					{#if capturesBytes > 0}
-						<div class="bg-blue-500 transition-all" style="width: {(capturesBytes / totalDisk) * 100}%" title="Captures: {formatBytes(capturesBytes)}"></div>
+						<div class="bg-blue-500 transition-all" style="width: {(capturesBytes / totalDisk) * 100}%" title="Snapshots: {formatBytes(capturesBytes)}"></div>
 					{/if}
 					{#if recordingBytes > 0}
 						<div class="bg-green-500 transition-all" style="width: {(recordingBytes / totalDisk) * 100}%" title="Recordings: {formatBytes(recordingBytes)}"></div>
@@ -251,7 +251,7 @@
 					<div class="rounded-lg border border-gray-800 bg-gray-950 p-3">
 						<div class="flex items-center gap-2">
 							<div class="h-3 w-3 rounded-full bg-blue-500"></div>
-							<p class="text-sm text-gray-400">Captures</p>
+							<p class="text-sm text-gray-400">Snapshots</p>
 						</div>
 						<p class="mt-1 text-lg font-bold text-white">{formatBytes(capturesBytes)}</p>
 					</div>
@@ -384,7 +384,7 @@
 		<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
 			<div class="rounded-lg border border-gray-800 bg-gray-900 p-4">
 				<div class="mb-3 flex items-center justify-between">
-					<h2 class="text-lg font-semibold text-white">Capture Activity</h2>
+					<h2 class="text-lg font-semibold text-white">Snapshot Activity</h2>
 					<select
 						bind:value={activityDays}
 						class="rounded border border-gray-700 bg-gray-800 px-2 py-1 text-sm text-gray-300"

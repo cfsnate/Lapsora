@@ -195,7 +195,7 @@
 	{:else if error}
 		<p class="text-sm text-red-400">{error}</p>
 	{:else if schedules.length === 0}
-		<p class="text-sm text-gray-500">No cleanup schedules configured. Captures and timelapses will be kept indefinitely.</p>
+		<p class="text-sm text-gray-500">No cleanup schedules configured. Snapshots and timelapses will be kept indefinitely.</p>
 	{:else}
 		<div class="space-y-3">
 			{#each schedules as schedule}
@@ -207,7 +207,7 @@
 						</div>
 						<div class="mt-1 flex items-center gap-3 text-xs text-gray-400">
 							<span>{describeCron(schedule)}</span>
-							<span>Captures: {schedule.capture_retention_days}d</span>
+							<span>Snapshots: {schedule.capture_retention_days}d</span>
 							<span>Timelapses: {schedule.timelapse_retention_days}d</span>
 							{#if schedule.next_run}
 								<span>Next: {formatNextRun(schedule.next_run)}</span>
@@ -307,7 +307,7 @@
 				<!-- Retention settings -->
 				<div class="grid grid-cols-2 gap-3">
 					<div>
-						<label class="mb-1 block text-sm font-medium text-gray-300">Capture retention (days)</label>
+						<label class="mb-1 block text-sm font-medium text-gray-300">Snapshot retention (days)</label>
 						<input
 							type="number"
 							bind:value={formCaptureDays}

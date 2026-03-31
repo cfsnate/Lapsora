@@ -279,7 +279,7 @@
 	{:else if filteredTimelapses.length === 0}
 		<div class="rounded-xl border border-gray-800 bg-gray-900 p-8 text-center">
 			<p class="text-gray-400">No timelapses found.</p>
-			<p class="mt-1 text-sm text-gray-500">Generate a timelapse from your captured frames.</p>
+			<p class="mt-1 text-sm text-gray-500">Generate a timelapse from your snapshots.</p>
 		</div>
 	{:else}
 		<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">

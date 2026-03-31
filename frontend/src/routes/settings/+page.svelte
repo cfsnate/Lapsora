@@ -13,7 +13,12 @@
 		timelapse_failure: true,
 		retention_summary: false,
 		low_disk_space: true,
-		capture_gap: true
+		capture_gap: true,
+		recording_started: true,
+		recording_stopped: true,
+		recording_failed: true,
+		clip_export_complete: true,
+		clip_export_failed: true,
 	});
 	let healthConfig = $state<HealthConfig>({
 		check_interval_seconds: 300,
@@ -170,14 +175,19 @@
 	}
 
 	const eventLabels: Record<string, string> = {
-		capture_failure: 'Capture failure',
+		capture_failure: 'Snapshot failure',
 		stream_unhealthy: 'Stream unhealthy',
 		stream_recovered: 'Stream recovered',
 		timelapse_complete: 'Timelapse complete',
 		timelapse_failure: 'Timelapse failure',
 		retention_summary: 'Retention summary',
 		low_disk_space: 'Low disk space',
-		capture_gap: 'Capture gap'
+		capture_gap: 'Snapshot gap',
+		recording_started: 'Recording started',
+		recording_stopped: 'Recording stopped',
+		recording_failed: 'Recording failed',
+		clip_export_complete: 'Clip export complete',
+		clip_export_failed: 'Clip export failed',
 	};
 </script>
 
@@ -434,11 +444,11 @@
 		<section class="space-y-6">
 			<h2 class="text-xl font-semibold text-white">Jobs</h2>
 
-			<!-- Capture Gap Alerting -->
+			<!-- Snapshot Gap Alerting -->
 			<div class="rounded-xl border border-gray-800 bg-gray-900 p-6">
-				<h3 class="mb-2 text-lg font-medium text-white">Capture Gap Alerting</h3>
+				<h3 class="mb-2 text-lg font-medium text-white">Snapshot Gap Alerting</h3>
 				<p class="mb-4 text-sm text-gray-400">
-					Alert when no frame is captured within 3× a profile's configured interval. Checks run every 60 minutes.
+					Alert when no snapshot is captured within 3× a profile's configured interval. Checks run every 60 minutes.
 				</p>
 				<label class="mb-4 flex items-center gap-3">
 					<input
@@ -446,7 +456,7 @@
 						bind:checked={captureGapConfig.enabled}
 						class="h-4 w-4 rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-blue-600"
 					/>
-					<span class="text-sm text-gray-200">Enable capture gap alerting</span>
+					<span class="text-sm text-gray-200">Enable snapshot gap alerting</span>
 				</label>
 				<button
 					onclick={saveCaptureGap}
@@ -461,7 +471,7 @@
 			<div>
 				<h3 class="mb-2 text-lg font-medium text-white">Data Cleanup</h3>
 				<p class="mb-4 text-sm text-gray-400">
-					Configure per-profile cleanup schedules to automatically remove old captures and timelapses.
+					Configure per-profile cleanup schedules to automatically remove old snapshots and timelapses. Recording retention is configured separately in each profile's recording settings.
 				</p>
 				<CleanupScheduleManager />
 			</div>

@@ -333,7 +333,7 @@
 		<div class="mx-4 w-full max-w-sm rounded-xl bg-gray-900 p-6 shadow-xl" onclick={(e) => e.stopPropagation()}>
 			<h2 class="mb-2 text-lg font-semibold text-gray-100">Delete Stream</h2>
 			<p class="mb-4 text-sm text-gray-400">
-				Are you sure you want to delete <strong class="text-gray-200">{deleteTarget.name}</strong>? This will also delete all associated profiles and captures.
+				Are you sure you want to delete <strong class="text-gray-200">{deleteTarget.name}</strong>? This will also delete all associated profiles, snapshots, and recordings.
 			</p>
 			<div class="flex justify-end gap-3">
 				<button

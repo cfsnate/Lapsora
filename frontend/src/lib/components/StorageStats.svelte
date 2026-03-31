@@ -26,7 +26,7 @@
 
 	<div class="mb-4 flex h-4 w-full overflow-hidden rounded-full bg-gray-900">
 		{#if capturesPct > 0}
-			<div class="bg-blue-500" style="width: {capturesDisplay}%" title="Captures: {formatBytes(stats.captures_size_bytes)}"></div>
+			<div class="bg-blue-500" style="width: {capturesDisplay}%" title="Snapshots: {formatBytes(stats.captures_size_bytes)}"></div>
 		{/if}
 		{#if timelapsesPct > 0}
 			<div class="bg-purple-500" style="width: {timelapsesDisplay}%" title="Timelapses: {formatBytes(stats.timelapses_size_bytes)}"></div>
@@ -37,14 +37,14 @@
 	</div>
 
 	<div class="mb-2 flex gap-4 text-xs text-gray-400">
-		<span class="flex items-center gap-1"><span class="inline-block h-2 w-2 rounded-full bg-blue-500"></span> Captures</span>
+		<span class="flex items-center gap-1"><span class="inline-block h-2 w-2 rounded-full bg-blue-500"></span> Snapshots</span>
 		<span class="flex items-center gap-1"><span class="inline-block h-2 w-2 rounded-full bg-purple-500"></span> Timelapses</span>
 		<span class="flex items-center gap-1"><span class="inline-block h-2 w-2 rounded-full bg-gray-700"></span> Free</span>
 	</div>
 
 	<div class="grid grid-cols-2 gap-3 text-sm">
 		<div>
-			<span class="text-gray-500">Captures:</span>
+			<span class="text-gray-500">Snapshots:</span>
 			<span class="ml-1 text-gray-300">{stats.captures_count} ({formatBytes(stats.captures_size_bytes)})</span>
 		</div>
 		<div>

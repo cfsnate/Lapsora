@@ -271,7 +271,7 @@
 							>
 								<img
 									src={api.getCaptureImageUrl(capture.id)}
-									alt="Capture {capture.id}"
+									alt="Snapshot {capture.id}"
 									class="aspect-video w-full object-cover transition-transform group-hover:scale-105"
 									loading="lazy"
 								/>
@@ -439,7 +439,7 @@
 		<div class="relative max-h-[90vh] max-w-[90vw]" onclick={(e) => e.stopPropagation()}>
 			<img
 				src={api.getCaptureImageUrl(lightboxCapture.id)}
-				alt="Capture {lightboxCapture.id}"
+				alt="Snapshot {lightboxCapture.id}"
 				class="max-h-[90vh] max-w-[90vw] rounded-lg object-contain"
 			/>
 			<div class="absolute bottom-4 left-4 rounded bg-black/70 px-3 py-1 text-sm text-gray-200">

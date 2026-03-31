@@ -106,7 +106,7 @@ let sun_events = $state<string[]>(
 	</div>
 
 	<div>
-		<label for="interval" class="mb-1 block text-sm font-medium text-gray-300">Capture interval (seconds)</label>
+		<label for="interval" class="mb-1 block text-sm font-medium text-gray-300">Snapshot interval (seconds)</label>
 		<input
 			id="interval"
 			type="number"
