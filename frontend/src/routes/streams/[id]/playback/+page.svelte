@@ -65,11 +65,12 @@
 		const profId = selectedProfileId;
 
 		function fetchAvailability() {
-			// Fetch last 7 days of availability. Use UTC date so it aligns with
-			// how the backend stores segment timestamps.
+			// Fetch availability covering the last 7 days through the end of today.
+			// Use 8 days from the start date so the window extends past the current
+			// moment — segments recorded today must be included.
 			const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 			const dateStr = sevenDaysAgo.toISOString().slice(0, 10);
-			api.getAvailability(profId, dateStr, 7)
+			api.getAvailability(profId, dateStr, 8)
 				.then((ranges) => { availabilityRanges = ranges; })
 				.catch(() => { availabilityRanges = []; });
 		}
