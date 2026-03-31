@@ -2,15 +2,16 @@
 
 from cryptography.fernet import InvalidToken
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 
-from app.config import decrypt, encrypt
+from app.config import decrypt, encrypt, settings
 from app.database import get_db
 from app.models import Setting, Stream
 from app.schemas import StreamCreate, StreamRead, StreamUpdate
 from app.services import rtsp
 from app.services import go2rtc
+from app.services.live_hls import live_hls_manager
 
 router = APIRouter(prefix="/api/streams", tags=["streams"])
 
@@ -140,17 +141,47 @@ async def preview_stream(stream_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{stream_id}/live-url")
-def get_live_url(stream_id: int, db: Session = Depends(get_db)):
+async def get_live_url(stream_id: int, db: Session = Depends(get_db)):
     stream = db.get(Stream, stream_id)
     if not stream:
         raise HTTPException(404, "Stream not found")
-    if stream.source_type != "go2rtc":
-        raise HTTPException(400, "Live view is only available for go2rtc streams")
 
-    base_url = go2rtc.get_go2rtc_url(db)
-    if not base_url:
-        raise HTTPException(400, "go2rtc URL not configured")
+    if stream.source_type == "go2rtc":
+        base_url = go2rtc.get_go2rtc_url(db)
+        if not base_url:
+            raise HTTPException(400, "go2rtc URL not configured")
+        ws_url = base_url.replace("https://", "wss://").replace("http://", "ws://")
+        return {"ws_url": f"{ws_url}/api/ws?src={stream.go2rtc_name}", "hls_url": None}
 
-    # Convert http(s) to ws(s) for WebSocket URL
-    ws_url = base_url.replace("https://", "wss://").replace("http://", "ws://")
-    return {"ws_url": f"{ws_url}/api/ws?src={stream.go2rtc_name}"}
+    # Native RTSP — transcode to HLS via FFmpeg
+    try:
+        rtsp_url = decrypt(stream.url)
+    except (InvalidToken, Exception):
+        raise HTTPException(400, "Stream URL could not be decrypted. Please re-enter the RTSP URL.")
+
+    try:
+        hls_path = await live_hls_manager.get_playlist_url(stream_id, rtsp_url)
+    except Exception as exc:
+        raise HTTPException(502, f"Failed to start live stream: {exc}")
+
+    return {"ws_url": None, "hls_url": hls_path}
+
+
+@router.get("/{stream_id}/live-hls/{filename}")
+async def serve_live_hls(stream_id: int, filename: str, db: Session = Depends(get_db)):
+    """Serve live HLS playlist and segment files."""
+    import os
+    if ".." in filename or "/" in filename:
+        raise HTTPException(400, "Invalid filename")
+
+    live_hls_manager.touch(stream_id)
+
+    file_path = os.path.join(settings.DATA_DIR, "live", str(stream_id), filename)
+    if not os.path.exists(file_path):
+        raise HTTPException(404, "File not found")
+
+    if filename.endswith(".m3u8"):
+        return FileResponse(file_path, media_type="application/vnd.apple.mpegurl")
+    elif filename.endswith(".ts"):
+        return FileResponse(file_path, media_type="video/mp2t")
+    raise HTTPException(400, "Unknown file type")

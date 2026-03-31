@@ -36,6 +36,7 @@
 		detachCurrentSource();
 
 		if (mode === 'live' && wsUrl) {
+			// go2rtc WebSocket MSE path
 			status = 'connecting';
 			errorMsg = '';
 
@@ -121,7 +122,8 @@
 				ws?.close();
 				URL.revokeObjectURL(objectUrl);
 			};
-		} else if (mode === 'recording' && hlsSrc) {
+		} else if (hlsSrc) {
+			// HLS path — used for recording playback AND live RTSP-via-FFmpeg
 			status = 'loading';
 			errorMsg = '';
 
@@ -189,7 +191,7 @@
 		playsinline
 		class="h-full w-full object-contain"
 		ontimeupdate={() => {
-			if (onTimeUpdate && mode === 'recording') {
+			if (onTimeUpdate && (mode === 'recording' || (mode === 'live' && !wsUrl))) {
 				onTimeUpdate(hlsInstance?.playingDate ?? null);
 			}
 		}}

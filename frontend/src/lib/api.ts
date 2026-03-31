@@ -33,7 +33,7 @@ export const api = {
 	testStream: (id: number) => request<TestResult>(`/streams/${id}/test`, { method: 'POST' }),
 	getStreamPreviewUrl: (id: number) => `${BASE}/streams/${id}/preview`,
 	discoverGo2rtcStreams: () => request<Go2rtcStreamInfo[]>('/streams/go2rtc/discover'),
-	getStreamLiveUrl: (id: number) => request<{ ws_url: string }>(`/streams/${id}/live-url`),
+	getStreamLiveUrl: (id: number) => request<{ ws_url: string | null; hls_url: string | null }>(`/streams/${id}/live-url`),
 
 	// Profiles
 	getStreamProfiles: (streamId: number) => request<Profile[]>(`/streams/${streamId}/profiles`),

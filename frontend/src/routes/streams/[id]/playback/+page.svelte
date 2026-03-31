@@ -21,6 +21,7 @@
 	let playing = $state(false);
 	let hlsSrc = $state('');
 	let liveWsUrl = $state<string | null>(null);
+	let liveHlsSrc = $state<string | null>(null);
 	// Separate tracking for the playback window so hlsSrc mutations don't re-trigger effects
 	let playbackWindowStart = $state<Date | null>(null);
 	let playbackWindowEnd = $state<Date | null>(null);
@@ -52,6 +53,7 @@
 				try {
 					const data = await api.getStreamLiveUrl(currentId);
 					liveWsUrl = data.ws_url;
+					liveHlsSrc = data.hls_url;
 				} catch { /* live URL unavailable */ }
 			})
 			.catch((err) => { error = err instanceof Error ? err.message : 'Failed to load'; })
@@ -83,8 +85,11 @@
 		playbackWindowStart = null;
 		playbackWindowEnd = null;
 		playbackRate = 1;
-		if (!liveWsUrl) {
-			api.getStreamLiveUrl(id).then(d => { liveWsUrl = d.ws_url; }).catch(() => {});
+		if (!liveWsUrl && !liveHlsSrc) {
+			api.getStreamLiveUrl(id).then(d => {
+				liveWsUrl = d.ws_url;
+				liveHlsSrc = d.hls_url;
+			}).catch(() => {});
 		}
 	}
 
@@ -190,7 +195,7 @@
 			<UnifiedPlayer
 				{mode}
 				wsUrl={liveWsUrl ?? undefined}
-				hlsSrc={hlsSrc || undefined}
+				hlsSrc={mode === 'live' ? (liveHlsSrc ?? undefined) : (hlsSrc || undefined)}
 				{playbackRate}
 				onTimeUpdate={handleTimeUpdate}
 				onError={(msg) => console.error('Player error:', msg)}

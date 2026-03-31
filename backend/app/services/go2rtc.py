@@ -65,6 +65,23 @@ async def grab_frame(base_url: str, name: str, retries: int = 3) -> bytes:
     raise last_exc or RuntimeError("grab_frame exhausted retries")
 
 
+async def ensure_rtsp_stream(base_url: str, name: str, rtsp_url: str) -> None:
+    """Register an RTSP URL with go2rtc under the given name if not already present."""
+    async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+        # Check if stream is already registered
+        resp = await client.get(f"{base_url}/api/streams")
+        resp.raise_for_status()
+        existing = resp.json()
+        if name not in existing:
+            # PUT registers (or replaces) a stream
+            r = await client.put(
+                f"{base_url}/api/streams",
+                params={"name": name, "src": rtsp_url},
+            )
+            r.raise_for_status()
+            logger.info("Registered RTSP stream %r with go2rtc", name)
+
+
 async def test_stream(base_url: str, name: str) -> dict:
     """Test a go2rtc stream by attempting a snapshot."""
     try:
