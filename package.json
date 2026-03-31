@@ -1,0 +1,7 @@
+{
+  "name": "lapsora",
+  "version": "1.0.0",
+  "scripts": {
+    "check": "cd frontend && npm run check"
+  }
+}
