@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import threading
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlparse
@@ -18,6 +19,47 @@ from app.services.notifications import _sse_lock, sse_queues
 logger = logging.getLogger(__name__)
 
 GO2RTC_DEFAULT_RTSP_PORT = 8554
+BACKOFF_SCHEDULE = [0, 5, 10, 30, 60]
+MIN_SEGMENT_SIZE = 1024
+
+
+def _slug(name: str) -> str:
+    """Convert a name to a safe directory component (lowercase, hyphens, no special chars)."""
+    name = name.strip().lower()
+    name = re.sub(r"[^\w\s-]", "", name)
+    name = re.sub(r"[\s_]+", "-", name)
+    name = re.sub(r"-+", "-", name).strip("-")
+    return name or "unnamed"
+
+
+def recording_dir(profile: Profile) -> str:
+    """Absolute output directory for a profile's recordings.
+
+    Layout: data/recordings/<stream-slug>-<stream_id>/<profile-slug>-<profile_id>/
+    IDs are appended so renames never cause collisions.
+    """
+    stream_slug = _slug(profile.stream.name) if profile.stream else "stream"
+    profile_slug = _slug(profile.name)
+    rel = os.path.join(
+        "recordings",
+        f"{stream_slug}-{profile.stream_id}",
+        f"{profile_slug}-{profile.id}",
+    )
+    return os.path.join(settings.DATA_DIR, rel)
+
+
+def recording_rel(profile: Profile, fname: str) -> str:
+    """DB-relative file_path for a segment filename."""
+    stream_slug = _slug(profile.stream.name) if profile.stream else "stream"
+    profile_slug = _slug(profile.name)
+    return os.path.join(
+        "recordings",
+        f"{stream_slug}-{profile.stream_id}",
+        f"{profile_slug}-{profile.id}",
+        fname,
+    )
+
+
 BACKOFF_SCHEDULE = [0, 5, 10, 30, 60]
 MIN_SEGMENT_SIZE = 1024
 
@@ -342,7 +384,7 @@ class RecordingManager:
                 return
 
             rtsp_url = resolve_recording_url(profile.stream, db)
-            output_dir = os.path.join(settings.DATA_DIR, "recordings", str(profile.id))
+            output_dir = recording_dir(profile)
 
             if profile_id in self._processes and self._processes[profile_id].state == "recording":
                 await self._processes[profile_id]._stop_ffmpeg()
@@ -449,7 +491,7 @@ async def scan_segments() -> None:
         cutoff = now - timedelta(seconds=30)
 
         for profile in profiles:
-            output_dir = os.path.join(settings.DATA_DIR, "recordings", str(profile.id))
+            output_dir = recording_dir(profile)
             if not os.path.isdir(output_dir):
                 continue
 
@@ -464,7 +506,7 @@ async def scan_segments() -> None:
                 if not fname.endswith(".ts"):
                     continue
                 fpath = os.path.join(output_dir, fname)
-                rel_path = os.path.join("recordings", str(profile.id), fname)
+                rel_path = recording_rel(profile, fname)
                 if rel_path in known_paths:
                     continue
                 stat = os.stat(fpath)

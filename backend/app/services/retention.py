@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import SessionLocal
 from app.models import Capture, Profile, RecordingSegment, Setting, Timelapse
+from app.services.recording import recording_dir
 
 logger = logging.getLogger(__name__)
 
@@ -222,7 +223,7 @@ async def run_recording_cleanup(profile_id: int, retention_days: int) -> dict:
                 summary["orphan_records_cleaned"] += 1
         db.commit()
 
-        rec_dir = os.path.join(settings.DATA_DIR, "recordings", str(profile_id))
+        rec_dir = recording_dir(profile) if (profile := db.get(Profile, profile_id)) else os.path.join(settings.DATA_DIR, "recordings", str(profile_id))
         if os.path.isdir(rec_dir):
             for root, dirs, files in os.walk(rec_dir, topdown=False):
                 if root == rec_dir:
