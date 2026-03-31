@@ -476,3 +476,14 @@ export interface ClipExportCreate {
 	quality_preset?: string;
 	resolution?: string;
 }
+
+export interface SetupStatus {
+	setup_required: boolean;
+}
+
+export interface SetupCreate {
+	username: string;
+	display_name: string;
+	password: string;
+	email?: string;
+}

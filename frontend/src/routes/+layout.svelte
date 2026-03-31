@@ -2,6 +2,7 @@
 	import '../app.css';
 	import type { Snippet } from 'svelte';
 	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
 	import { api } from '$lib/api';
 	import type { Notification } from '$lib/types';
 	import { setUse24h } from '$lib/utils';
@@ -13,6 +14,8 @@
 	let notifications = $state<Notification[]>([]);
 	let toasts = $state<{ id: number; title: string; body: string; level: string }[]>([]);
 	let toastCounter = $state(0);
+	let setupChecked = $state(false);
+	let setupRequired = $state(false);
 
 	const navItems = [
 		{ href: '/', label: 'Dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1' },
@@ -36,8 +39,23 @@
 		toasts = toasts.filter((t) => t.id !== id);
 	}
 
-	// Load notifications and time format once on mount
+	// Load notifications, time format, and check setup status once on mount
 	$effect(() => {
+		const currentPath = $page.url.pathname;
+
+		api.getSetupStatus().then((status) => {
+			setupRequired = status.setup_required;
+			setupChecked = true;
+			if (status.setup_required && (currentPath as string) !== '/setup') {
+				goto('/setup' as string);
+			} else if (!status.setup_required && (currentPath as string) === '/setup') {
+				goto('/');
+			}
+		}).catch(() => {
+			// If setup-status fetch fails, allow the app to proceed normally
+			setupChecked = true;
+		});
+
 		loadNotifications();
 		api.getTimeFormatConfig().then((cfg) => {
 			setUse24h(cfg.use_24h);
@@ -83,34 +101,43 @@
 	});
 </script>
 
-<div class="flex h-screen bg-gray-950 text-gray-100">
-	<aside class="fixed left-0 top-0 z-50 flex h-full w-56 flex-col border-r border-gray-800 bg-gray-900">
-		<div class="flex h-14 items-center justify-between border-b border-gray-800 px-4">
-			<h1 class="text-lg font-bold tracking-tight text-white">Lapsora</h1>
-			<NotificationBell {notifications} onRefresh={loadNotifications} />
-		</div>
-		<nav class="flex-1 space-y-1 p-3">
-			{#each navItems as item}
-				<a
-					href={item.href}
-					class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors {
-						$page.url.pathname === item.href || (item.href !== '/' && $page.url.pathname.startsWith(item.href))
-							? 'bg-gray-800 text-white font-medium'
-							: 'text-gray-400 hover:bg-gray-800 hover:text-white'
-					}"
-				>
-					<svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d={item.icon} />
-					</svg>
-					{item.label}
-				</a>
-			{/each}
-		</nav>
-	</aside>
+{#if !setupChecked}
+	<!-- Blank screen while checking setup status — prevents nav flash before redirect -->
+	<div class="flex h-screen items-center justify-center bg-gray-950"></div>
+{:else if setupRequired}
+	<!-- Setup wizard — render without nav shell -->
+	{@render children()}
+{:else}
+	<div class="flex h-screen bg-gray-950 text-gray-100">
+		<aside class="fixed left-0 top-0 z-50 flex h-full w-56 flex-col border-r border-gray-800 bg-gray-900">
+			<div class="flex h-14 items-center justify-between border-b border-gray-800 px-4">
+				<h1 class="text-lg font-bold tracking-tight text-white">Lapsora</h1>
+				<NotificationBell {notifications} onRefresh={loadNotifications} />
+			</div>
+			<nav class="flex-1 space-y-1 p-3">
+				{#each navItems as item}
+					<a
+						href={item.href}
+						class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors {
+							$page.url.pathname === item.href || (item.href !== '/' && $page.url.pathname.startsWith(item.href))
+								? 'bg-gray-800 text-white font-medium'
+								: 'text-gray-400 hover:bg-gray-800 hover:text-white'
+						}"
+					>
+						<svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d={item.icon} />
+						</svg>
+						{item.label}
+					</a>
+				{/each}
+			</nav>
+		</aside>
 
-	<main class="ml-56 flex-1 overflow-auto p-6">
-		{@render children()}
-	</main>
-</div>
+		<main class="ml-56 flex-1 overflow-auto p-6">
+			{@render children()}
+		</main>
+	</div>
 
-<NotificationToast {toasts} onDismiss={dismissToast} />
+	<NotificationToast {toasts} onDismiss={dismissToast} />
+{/if}
+
