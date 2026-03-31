@@ -167,6 +167,8 @@ class RecordingProcess:
 
     async def _start_ffmpeg(self) -> None:
         args = self._build_ffmpeg_args()
+        logger.info("Starting FFmpeg for profile %d with command: %s", self.profile_id, ' '.join(args))
+        
         self.process = await asyncio.create_subprocess_exec(
             *args,
             stdout=asyncio.subprocess.DEVNULL,
@@ -221,28 +223,47 @@ class RecordingProcess:
 
     async def _wait_for_exit(self) -> None:
         returncode = await self.process.wait()
-        await self._on_process_exit(returncode)
+        # Read stderr to get error details
+        stderr_output = ""
+        if self.process.stderr:
+            try:
+                stderr_data = await self.process.stderr.read()
+                stderr_output = stderr_data.decode('utf-8', errors='replace').strip()
+            except Exception as e:
+                logger.warning("Failed to read FFmpeg stderr: %s", e)
+        
+        await self._on_process_exit(returncode, stderr_output)
 
-    async def _on_process_exit(self, returncode: int) -> None:
+    async def _on_process_exit(self, returncode: int, stderr_output: str = "") -> None:
         if self.state == "stopped":
             return
         self.state = "error"
+        
+        # Log stderr output for debugging
+        if stderr_output:
+            logger.error("FFmpeg stderr for profile %d: %s", self.profile_id, stderr_output)
         
         # Emit recording failed event
         profile_title = f"Profile {self.profile_id}"
         failed_at = datetime.now(UTC)
         duration = (failed_at - self.started_at).total_seconds() if self.started_at else 0
+        
+        # Include stderr in the notification body if available
+        error_detail = f" Error: {stderr_output}" if stderr_output else ""
+        notification_body = f"FFmpeg recording process failed for profile {self.profile_id} with exit code {returncode} after {duration:.1f} seconds. Retry attempt {self.retry_count + 1}.{error_detail}"
+        
         await emit(
             "recording_failed",
             f"Recording failed for {profile_title}",
-            f"FFmpeg recording process failed for profile {self.profile_id} with exit code {returncode} after {duration:.1f} seconds. Retry attempt {self.retry_count + 1}.",
+            notification_body,
             "error",
             {
                 "profile_id": self.profile_id, 
                 "stream_id": self.stream_id, 
                 "exit_code": returncode,
                 "duration_seconds": duration,
-                "retry_count": self.retry_count + 1
+                "retry_count": self.retry_count + 1,
+                "stderr": stderr_output
             }
         )
         
