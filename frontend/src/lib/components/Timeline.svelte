@@ -12,7 +12,7 @@
 	let { availabilityRanges, currentTime, onSeek, selectionStart = null, selectionEnd = null, clipMode = false, onSelectionChange }: Props = $props();
 
 	let containerEl = $state<HTMLDivElement | null>(null);
-	let containerWidth = $state(800);
+	let containerWidth = $state(0);
 	let viewStart = $state<Date>(new Date(Date.now() - 60 * 60 * 1000));
 	let viewEnd = $state<Date>(new Date());
 	let hoverX = $state<number | null>(null);
@@ -20,6 +20,7 @@
 	let dragStartX = $state(0);
 	let dragStartView = $state<{ start: number; end: number }>({ start: 0, end: 0 });
 	let activeZoom = $state('1h');
+	let hasAutoFit = $state(false);
 	function toLocalISOString(d: Date): string {
 		const pad = (n: number) => String(n).padStart(2, '0');
 		return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -48,6 +49,45 @@
 		return () => ro.disconnect();
 	});
 
+	// Auto-fit view to recording data on first load
+	$effect(() => {
+		if (hasAutoFit || availabilityRanges.length === 0) return;
+		hasAutoFit = true;
+
+		// Find the most recent recording end time
+		let latestEnd = 0;
+		let earliestStart = Infinity;
+		for (const r of availabilityRanges) {
+			const s = new Date(r.start).getTime();
+			const e = new Date(r.end).getTime();
+			if (e > latestEnd) latestEnd = e;
+			if (s < earliestStart) earliestStart = s;
+		}
+
+		const totalSpan = latestEnd - earliestStart;
+		const now = Date.now();
+
+		if (totalSpan <= 6 * 60 * 60 * 1000) {
+			// Less than 6 hours of recordings: show a 6h window centered on the data
+			const center = (earliestStart + latestEnd) / 2;
+			const windowMs = 6 * 60 * 60 * 1000;
+			viewEnd = new Date(Math.min(now, center + windowMs / 2));
+			viewStart = new Date(viewEnd.getTime() - windowMs);
+			activeZoom = '6h';
+		} else if (totalSpan <= 24 * 60 * 60 * 1000) {
+			// Show 24h window ending at now (or latest recording)
+			viewEnd = new Date(Math.min(now, latestEnd + 30 * 60 * 1000));
+			viewStart = new Date(viewEnd.getTime() - 24 * 60 * 60 * 1000);
+			activeZoom = '24h';
+		} else {
+			// More than a day: show the full span with 10% padding
+			const pad = totalSpan * 0.1;
+			viewStart = new Date(earliestStart - pad);
+			viewEnd = new Date(Math.min(now, latestEnd + pad));
+			activeZoom = '';
+		}
+	});
+
 	function timeToX(time: Date): number {
 		return ((time.getTime() - viewStart.getTime()) / (viewEnd.getTime() - viewStart.getTime())) * containerWidth;
 	}
@@ -70,6 +110,7 @@
 	);
 
 	let rects = $derived(
+		containerWidth <= 0 ? [] :
 		parsedRanges
 			.filter(r => r.end.getTime() > viewStart.getTime() && r.start.getTime() < viewEnd.getTime())
 			.map(r => {
@@ -86,12 +127,20 @@
 	);
 
 	let timeLabels = $derived.by(() => {
+		if (containerWidth <= 0) return [];
 		const range = viewEnd.getTime() - viewStart.getTime();
-		const count = range > 4 * 24 * 60 * 60 * 1000 ? 7 : range > 12 * 60 * 60 * 1000 ? 6 : 5;
+		const isMultiDay = range > 24 * 60 * 60 * 1000;
+		// Adjust label count based on container width to prevent overlap
+		const minLabelSpacing = isMultiDay ? 100 : 70;
+		const maxLabels = Math.max(2, Math.floor(containerWidth / minLabelSpacing));
+		const count = Math.min(maxLabels, range > 4 * 24 * 60 * 60 * 1000 ? 7 : range > 12 * 60 * 60 * 1000 ? 6 : 5);
 		const step = range / count;
 		return Array.from({ length: count + 1 }, (_, i) => {
 			const t = new Date(viewStart.getTime() + step * i);
-			return { time: t, x: timeToX(t), label: formatTimeLabel(t) };
+			const label = isMultiDay
+				? t.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + t.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true })
+				: formatTimeLabel(t);
+			return { time: t, x: timeToX(t), label };
 		});
 	});
 
@@ -214,7 +263,7 @@
 	>
 		{#each rects as rect}
 			<div class="absolute top-0 h-full bg-green-500/80 rounded-sm"
-				style="transform: translateX({rect.x}px); width: {rect.width}px; will-change: transform;"></div>
+				style="left: {Math.round(rect.x)}px; width: {Math.round(rect.width)}px;"></div>
 		{/each}
 
 		{#if selectionStart && selectionEnd}
@@ -237,7 +286,7 @@
 
 		{#if playheadX !== null}
 			<div class="absolute top-0 h-full w-0.5 bg-red-400 pointer-events-none"
-				style="transform: translateX({playheadX}px); will-change: transform;"></div>
+				style="left: {Math.round(playheadX)}px;"></div>
 		{/if}
 
 		{#if selectionStart && selectionEnd}
@@ -263,9 +312,9 @@
 
 	<!-- Time axis labels -->
 	<div class="relative h-4 overflow-hidden">
-		{#each timeLabels as label}
+		{#each timeLabels as label, i}
 			<span class="absolute text-xs text-gray-500 whitespace-nowrap"
-				style="left: {Math.max(0, Math.min(containerWidth - 40, label.x))}px; transform: translateX(-50%);">{label.label}</span>
+				style="left: {Math.max(0, Math.min(containerWidth - 40, label.x))}px; transform: translateX({i === 0 ? '0%' : i === timeLabels.length - 1 ? '-100%' : '-50%'});">{label.label}</span>
 		{/each}
 	</div>
 
