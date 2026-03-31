@@ -52,7 +52,7 @@ def get_profile(profile_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/profiles/{profile_id}", response_model=ProfileRead)
-def update_profile(profile_id: int, body: ProfileUpdate, db: Session = Depends(get_db)):
+async def update_profile(profile_id: int, body: ProfileUpdate, db: Session = Depends(get_db)):
     profile = db.get(Profile, profile_id)
     if not profile:
         raise HTTPException(404, "Profile not found")
@@ -86,33 +86,27 @@ def update_profile(profile_id: int, body: ProfileUpdate, db: Session = Depends(g
         "segment_duration_seconds",
     )
     if any(k in update_data for k in recording_fields):
-        import asyncio
-
         from app.services.recording import recording_manager
 
-        loop = asyncio.get_event_loop()
         if profile.recording_enabled:
-            asyncio.run_coroutine_threadsafe(recording_manager.restart(profile.id), loop)
+            await recording_manager.restart(profile.id)
         else:
-            asyncio.run_coroutine_threadsafe(recording_manager.stop(profile.id), loop)
+            await recording_manager.stop(profile.id)
 
     return profile
 
 
 @router.delete("/profiles/{profile_id}", status_code=204)
-def delete_profile(profile_id: int, db: Session = Depends(get_db)):
+async def delete_profile(profile_id: int, db: Session = Depends(get_db)):
     profile = db.get(Profile, profile_id)
     if not profile:
         raise HTTPException(404, "Profile not found")
 
     scheduler.remove_capture_job(profile.id)
 
-    import asyncio
-
     from app.services.recording import recording_manager
 
-    loop = asyncio.get_event_loop()
-    asyncio.run_coroutine_threadsafe(recording_manager.stop(profile.id), loop)
+    await recording_manager.stop(profile.id)
 
     # Remove capture files
     capture_dir = os.path.join(
