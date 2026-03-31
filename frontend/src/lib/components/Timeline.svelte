@@ -205,49 +205,49 @@
 		tabindex="0"
 	>
 		{#each rects as rect}
-			<div class="absolute top-0 h-full bg-green-500 rounded-sm"
-				style="left: {rect.x}px; width: {rect.width}px;"></div>
+			<div class="absolute top-0 h-full bg-green-500/80 rounded-sm"
+				style="transform: translateX({rect.x}px); width: {rect.width}px; will-change: transform;"></div>
 		{/each}
 
 		{#if selectionStart && selectionEnd}
 			<div class="absolute top-0 h-full bg-blue-500/30 pointer-events-none"
-				style="left: {Math.max(0, timeToX(selectionStart))}px; width: {Math.max(1, timeToX(selectionEnd) - timeToX(selectionStart))}px;">
+				style="transform: translateX({Math.max(0, timeToX(selectionStart))}px); width: {Math.max(1, timeToX(selectionEnd) - timeToX(selectionStart))}px;">
 			</div>
 			<div class="absolute top-0 h-full w-0.5 bg-white cursor-col-resize"
-				style="left: {timeToX(selectionStart)}px;"
+				style="transform: translateX({timeToX(selectionStart)}px);"
 				aria-label="Export start marker">
 			</div>
 			<div class="absolute top-0 h-full w-0.5 bg-white cursor-col-resize"
-				style="left: {timeToX(selectionEnd)}px;"
+				style="transform: translateX({timeToX(selectionEnd)}px);"
 				aria-label="Export end marker">
 			</div>
 		{:else if selectionStart}
 			<div class="absolute top-0 h-full w-0.5 bg-white pointer-events-none"
-				style="left: {timeToX(selectionStart)}px;">
+				style="transform: translateX({timeToX(selectionStart)}px);">
 			</div>
 		{/if}
 
 		{#if playheadX !== null}
-			<div class="absolute top-0 h-full w-0.5 bg-white pointer-events-none"
-				style="left: {playheadX}px;"></div>
+			<div class="absolute top-0 h-full w-0.5 bg-red-400 pointer-events-none"
+				style="transform: translateX({playheadX}px); will-change: transform;"></div>
 		{/if}
 
 		{#if selectionStart && selectionEnd}
 			<div class="absolute -top-8 rounded bg-gray-900 px-2 py-1 text-xs text-white border border-gray-700 shadow-lg pointer-events-none whitespace-nowrap"
-				style="left: {timeToX(selectionStart)}px; transform: translateX(-50%);">
+				style="transform: translateX(calc({timeToX(selectionStart)}px - 50%));">
 				{formatTooltipTime(selectionStart)}
 			</div>
 			<div class="absolute -top-8 rounded bg-gray-900 px-2 py-1 text-xs text-white border border-gray-700 shadow-lg pointer-events-none whitespace-nowrap"
-				style="left: {timeToX(selectionEnd)}px; transform: translateX(-50%);">
+				style="transform: translateX(calc({timeToX(selectionEnd)}px - 50%));">
 				{formatTooltipTime(selectionEnd)}
 			</div>
 		{/if}
 
 		{#if hoverX !== null && !isDragging}
 			<div class="absolute top-0 h-full w-px bg-gray-500 pointer-events-none"
-				style="left: {hoverX}px;"></div>
+				style="transform: translateX({hoverX}px);"></div>
 			<div class="absolute -top-8 rounded bg-gray-900 px-2 py-1 text-xs text-gray-300 shadow-lg border border-gray-700 pointer-events-none whitespace-nowrap"
-				style="left: {hoverX}px; transform: translateX(-50%);">
+				style="transform: translateX(calc({hoverX}px - 50%));">
 				{formatTooltipTime(xToTime(hoverX))}
 			</div>
 		{/if}
@@ -256,8 +256,8 @@
 	<!-- Time axis labels -->
 	<div class="relative h-4">
 		{#each timeLabels as label}
-			<span class="absolute text-xs text-gray-500 -translate-x-1/2"
-				style="left: {label.x}px;">{label.label}</span>
+			<span class="absolute text-xs text-gray-500"
+				style="transform: translateX(calc({label.x}px - 50%));">{label.label}</span>
 		{/each}
 	</div>
 
