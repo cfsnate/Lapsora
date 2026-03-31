@@ -17,6 +17,13 @@ class Settings(BaseSettings):
     JWT_EXPIRY_HOURS: int = 24
     JWT_ALGORITHM: str = "HS256"
 
+    # TLS / ACME settings
+    TLS_ENABLED: bool = False
+    TLS_CERT_DIR: str = ""  # defaults to DATA_DIR/certs at runtime
+    ACME_DIRECTORY_URL: str = "https://acme-v02.api.letsencrypt.org/directory"
+    ACME_EMAIL: str = ""
+    TLS_DOMAIN: str = ""
+
     def model_post_init(self, __context: object) -> None:
         if not self.SECRET_KEY:
             import logging

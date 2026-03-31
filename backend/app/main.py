@@ -28,6 +28,7 @@ async def lifespan(app: FastAPI):
     (data_dir / "recordings").mkdir(exist_ok=True)
     (data_dir / "exports").mkdir(exist_ok=True)
     (data_dir / "previews").mkdir(exist_ok=True)
+    (data_dir / "certs").mkdir(exist_ok=True)
 
     # Run database migrations
     run_migrations(engine)

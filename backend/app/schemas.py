@@ -629,3 +629,35 @@ class UserProfileAccessUpdate(BaseModel):
 
 class UserAdminRead(UserRead):
     accessible_profile_ids: list[int]
+
+
+# --- TLS / ACME ---
+
+
+class TLSConfigRead(BaseModel):
+    domain: str
+    email: str
+    acme_directory_url: str
+    enabled: bool
+    has_certificate: bool
+
+
+class TLSConfigUpdate(BaseModel):
+    domain: str | None = None
+    email: str | None = None
+    acme_directory_url: str | None = None
+    enabled: bool | None = None
+
+
+class TLSCertificateInfo(BaseModel):
+    domain: str
+    issuer: str
+    not_before: datetime
+    not_after: datetime
+    serial_number: str
+    is_expired: bool
+    days_until_expiry: int
+
+
+class TLSAcquireRequest(BaseModel):
+    force: bool = False
