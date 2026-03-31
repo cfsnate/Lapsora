@@ -1,7 +1,7 @@
 """Playback API: HLS playlists, segment serving, and availability queries."""
 
 import os
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import FileResponse
@@ -24,7 +24,11 @@ def get_playlist(
 ):
     playlist = generate_playlist(db, profile_id, start, end)
     if not playlist:
-        raise HTTPException(status_code=404, detail="No recordings found in range")
+        # Return an empty VOD playlist rather than 404 — HLS.js treats 404 as fatal
+        # and won't recover. An empty playlist with EXT-X-ENDLIST tells it cleanly
+        # that there's nothing to play in this range.
+        empty = "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:10\n#EXT-X-PLAYLIST-TYPE:VOD\n#EXT-X-ENDLIST\n"
+        return Response(content=empty, media_type="application/vnd.apple.mpegurl", status_code=200)
     return Response(content=playlist, media_type="application/vnd.apple.mpegurl")
 
 
@@ -48,6 +52,6 @@ def get_availability(
     days: int = Query(default=1),
     db: Session = Depends(get_db),
 ):
-    day_start = datetime.strptime(date, "%Y-%m-%d")
+    day_start = datetime.strptime(date, "%Y-%m-%d").replace(tzinfo=UTC)
     day_end = day_start + timedelta(days=days)
     return get_availability_ranges(db, profile_id, day_start, day_end)
