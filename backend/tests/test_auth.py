@@ -803,3 +803,328 @@ def test_update_me_no_role_field(client: TestClient):
     # Role must remain unchanged
     me_resp = client.get(ME_URL)
     assert me_resp.json()["role"] == "admin"
+
+
+# ---------------------------------------------------------------------------
+# Group CRUD tests
+# ---------------------------------------------------------------------------
+
+GROUPS_URL = "/api/auth/groups"
+
+
+def test_list_groups_empty(client: TestClient):
+    """Admin listing groups on empty DB returns []."""
+    _setup_and_login(client)
+    resp = client.get(GROUPS_URL)
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+def test_create_group_basic(client: TestClient):
+    """Admin can create a group with name and role."""
+    _setup_and_login(client)
+    resp = client.post(GROUPS_URL, json={"name": "viewers", "role": "user"})
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["name"] == "viewers"
+    assert data["role"] == "user"
+    assert data["profile_ids"] == []
+    assert data["oidc_group_names"] == []
+
+
+def test_create_group_with_profiles_and_mappings(client: TestClient, db):
+    """Admin can create a group with profile access and OIDC mappings."""
+    _setup_and_login(client)
+    _, profiles = _make_stream_and_profiles(db, count=2)
+    resp = client.post(GROUPS_URL, json={
+        "name": "operators",
+        "role": "admin",
+        "profile_ids": [profiles[0].id, profiles[1].id],
+        "oidc_group_names": ["oidc-operators", "ops-team"],
+    })
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["role"] == "admin"
+    assert set(data["profile_ids"]) == {profiles[0].id, profiles[1].id}
+    assert set(data["oidc_group_names"]) == {"oidc-operators", "ops-team"}
+
+
+def test_create_group_duplicate_name(client: TestClient):
+    """Creating a group with a duplicate name returns 409."""
+    _setup_and_login(client)
+    client.post(GROUPS_URL, json={"name": "dup"})
+    resp = client.post(GROUPS_URL, json={"name": "dup"})
+    assert resp.status_code == 409
+    assert "group_name_taken" in resp.json()["detail"]
+
+
+def test_create_group_oidc_name_conflict(client: TestClient):
+    """Creating a group reusing an OIDC group name already mapped elsewhere returns 409."""
+    _setup_and_login(client)
+    client.post(GROUPS_URL, json={"name": "g1", "oidc_group_names": ["shared-name"]})
+    resp = client.post(GROUPS_URL, json={"name": "g2", "oidc_group_names": ["shared-name"]})
+    assert resp.status_code == 409
+    assert "oidc_group_names_taken" in resp.json()["detail"]
+
+
+def test_create_group_non_admin_rejected(client: TestClient, db):
+    """Non-admin user cannot create groups -> 403."""
+    _setup_and_login(client)
+    client.post(f"{USERS_URL}", json={
+        "username": "viewer", "display_name": "V", "password": "viewerpass1", "role": "user"
+    })
+    client.post(LOGOUT_URL)
+    client.post(LOGIN_URL, json={"username": "viewer", "password": "viewerpass1"})
+    resp = client.post(GROUPS_URL, json={"name": "nope"})
+    assert resp.status_code == 403
+
+
+def test_update_group_name_and_role(client: TestClient):
+    """Admin can update group name and role."""
+    _setup_and_login(client)
+    resp = client.post(GROUPS_URL, json={"name": "old", "role": "user"})
+    gid = resp.json()["id"]
+    resp = client.put(f"{GROUPS_URL}/{gid}", json={"name": "new", "role": "admin"})
+    assert resp.status_code == 200
+    assert resp.json()["name"] == "new"
+    assert resp.json()["role"] == "admin"
+
+
+def test_update_group_profiles_and_mappings(client: TestClient, db):
+    """Admin can replace a group's profiles and OIDC mappings."""
+    _setup_and_login(client)
+    _, profiles = _make_stream_and_profiles(db, count=3)
+    resp = client.post(GROUPS_URL, json={
+        "name": "g", "profile_ids": [profiles[0].id], "oidc_group_names": ["old-mapping"],
+    })
+    gid = resp.json()["id"]
+
+    resp = client.put(f"{GROUPS_URL}/{gid}", json={
+        "profile_ids": [profiles[1].id, profiles[2].id],
+        "oidc_group_names": ["new-mapping"],
+    })
+    assert resp.status_code == 200
+    data = resp.json()
+    assert set(data["profile_ids"]) == {profiles[1].id, profiles[2].id}
+    assert data["oidc_group_names"] == ["new-mapping"]
+
+
+def test_delete_group(client: TestClient):
+    """Admin can delete a group."""
+    _setup_and_login(client)
+    resp = client.post(GROUPS_URL, json={"name": "to-delete"})
+    gid = resp.json()["id"]
+    resp = client.delete(f"{GROUPS_URL}/{gid}")
+    assert resp.status_code == 204
+
+    # Confirm it's gone
+    resp = client.get(GROUPS_URL)
+    assert all(g["id"] != gid for g in resp.json())
+
+
+def test_delete_group_not_found(client: TestClient):
+    """Deleting a non-existent group returns 404."""
+    _setup_and_login(client)
+    resp = client.delete(f"{GROUPS_URL}/9999")
+    assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# OIDC Group Sync tests
+# ---------------------------------------------------------------------------
+
+
+def test_oidc_group_sync_sets_role_and_profiles(client: TestClient, db):
+    """OIDC callback with matching groups syncs user role and profile access."""
+    from unittest.mock import AsyncMock, patch
+    from app.models import Group, GroupProfileAccess, OIDCGroupMapping, Setting, User, UserProfileAccess
+    from app.config import encrypt
+
+    _setup_and_login(client)
+
+    # Create a stream with profiles
+    _, profiles = _make_stream_and_profiles(db, count=3)
+
+    # Create a group with admin role and profiles[0,1]
+    group = Group(name="admins", role="admin")
+    db.add(group)
+    db.flush()
+    db.add(GroupProfileAccess(group_id=group.id, profile_id=profiles[0].id))
+    db.add(GroupProfileAccess(group_id=group.id, profile_id=profiles[1].id))
+    db.add(OIDCGroupMapping(group_id=group.id, oidc_group_name="idp-admins"))
+
+    # Setup OIDC config
+    db.add(Setting(key="oidc_issuer_url", value="https://idp.example.com"))
+    db.add(Setting(key="oidc_client_id", value="test-client"))
+    db.add(Setting(key="oidc_client_secret", value=encrypt("secret")))
+    db.commit()
+
+    # Mock the OIDC flow and call the internal sync function directly
+    from app.routers.auth import _sync_user_groups
+
+    # Create a test OIDC user
+    oidc_user = User(
+        username="oidcuser",
+        display_name="OIDC User",
+        password_hash="!",
+        role="user",
+        oidc_provider="oidc",
+        oidc_subject="sub123",
+    )
+    db.add(oidc_user)
+    db.commit()
+    db.refresh(oidc_user)
+
+    # Simulate userinfo with groups claim
+    userinfo = {"sub": "sub123", "groups": ["idp-admins", "some-other-group"]}
+    _sync_user_groups(db, oidc_user, userinfo)
+    db.refresh(oidc_user)
+
+    assert oidc_user.role == "admin"
+    access = db.query(UserProfileAccess).filter(UserProfileAccess.user_id == oidc_user.id).all()
+    assert set(r.profile_id for r in access) == {profiles[0].id, profiles[1].id}
+
+
+def test_oidc_group_sync_union_of_multiple_groups(client: TestClient, db):
+    """User matching multiple groups gets the union of all profile sets."""
+    from app.models import Group, GroupProfileAccess, OIDCGroupMapping, User, UserProfileAccess
+    from app.routers.auth import _sync_user_groups
+
+    _setup_and_login(client)
+    _, profiles = _make_stream_and_profiles(db, count=3)
+
+    g1 = Group(name="g1", role="user")
+    g2 = Group(name="g2", role="user")
+    db.add_all([g1, g2])
+    db.flush()
+    db.add(GroupProfileAccess(group_id=g1.id, profile_id=profiles[0].id))
+    db.add(GroupProfileAccess(group_id=g2.id, profile_id=profiles[1].id))
+    db.add(GroupProfileAccess(group_id=g2.id, profile_id=profiles[2].id))
+    db.add(OIDCGroupMapping(group_id=g1.id, oidc_group_name="team-a"))
+    db.add(OIDCGroupMapping(group_id=g2.id, oidc_group_name="team-b"))
+
+    user = User(username="multi", display_name="Multi", password_hash="!", role="user",
+                oidc_provider="oidc", oidc_subject="multi-sub")
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    _sync_user_groups(db, user, {"sub": "multi-sub", "groups": ["team-a", "team-b"]})
+    db.refresh(user)
+
+    assert user.role == "user"
+    access = db.query(UserProfileAccess).filter(UserProfileAccess.user_id == user.id).all()
+    assert set(r.profile_id for r in access) == {profiles[0].id, profiles[1].id, profiles[2].id}
+
+
+def test_oidc_group_sync_admin_wins(client: TestClient, db):
+    """If any matched group has role admin, user becomes admin."""
+    from app.models import Group, OIDCGroupMapping, User
+    from app.routers.auth import _sync_user_groups
+
+    _setup_and_login(client)
+
+    g1 = Group(name="users-g", role="user")
+    g2 = Group(name="admins-g", role="admin")
+    db.add_all([g1, g2])
+    db.flush()
+    db.add(OIDCGroupMapping(group_id=g1.id, oidc_group_name="oidc-users"))
+    db.add(OIDCGroupMapping(group_id=g2.id, oidc_group_name="oidc-admins"))
+
+    user = User(username="mixed", display_name="Mixed", password_hash="!", role="user",
+                oidc_provider="oidc", oidc_subject="mixed-sub")
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    _sync_user_groups(db, user, {"sub": "mixed-sub", "groups": ["oidc-users", "oidc-admins"]})
+    db.refresh(user)
+
+    assert user.role == "admin"
+
+
+def test_oidc_group_sync_no_matching_groups_noop(client: TestClient, db):
+    """If no OIDC groups match any mapping, sync is a no-op."""
+    from app.models import User, UserProfileAccess
+    from app.routers.auth import _sync_user_groups
+
+    _setup_and_login(client)
+
+    user = User(username="nomatch", display_name="No Match", password_hash="!", role="user",
+                oidc_provider="oidc", oidc_subject="nomatch-sub")
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    _sync_user_groups(db, user, {"sub": "nomatch-sub", "groups": ["unknown-group"]})
+    db.refresh(user)
+
+    assert user.role == "user"
+    access = db.query(UserProfileAccess).filter(UserProfileAccess.user_id == user.id).all()
+    assert len(access) == 0
+
+
+def test_oidc_group_sync_custom_claim_name(client: TestClient, db):
+    """Groups sync respects the configurable groups_claim setting name."""
+    from app.models import Group, GroupProfileAccess, OIDCGroupMapping, Setting, User, UserProfileAccess
+    from app.routers.auth import _sync_user_groups
+
+    _setup_and_login(client)
+    _, profiles = _make_stream_and_profiles(db, count=1)
+
+    # Set custom claim name
+    db.add(Setting(key="oidc_groups_claim", value="roles"))
+
+    g = Group(name="custom-claim-g", role="user")
+    db.add(g)
+    db.flush()
+    db.add(GroupProfileAccess(group_id=g.id, profile_id=profiles[0].id))
+    db.add(OIDCGroupMapping(group_id=g.id, oidc_group_name="viewer"))
+
+    user = User(username="custom-claim", display_name="CC", password_hash="!", role="user",
+                oidc_provider="oidc", oidc_subject="cc-sub")
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    # Default 'groups' key should NOT match
+    _sync_user_groups(db, user, {"sub": "cc-sub", "groups": ["viewer"]})
+    db.refresh(user)
+    access = db.query(UserProfileAccess).filter(UserProfileAccess.user_id == user.id).all()
+    assert len(access) == 0  # no match because claim is 'roles' not 'groups'
+
+    # Using the correct 'roles' key should match
+    _sync_user_groups(db, user, {"sub": "cc-sub", "roles": ["viewer"]})
+    db.refresh(user)
+    access = db.query(UserProfileAccess).filter(UserProfileAccess.user_id == user.id).all()
+    assert len(access) == 1
+    assert access[0].profile_id == profiles[0].id
+
+
+def test_oidc_config_groups_claim_round_trip(client: TestClient, db):
+    """Saving and reading groups_claim in OIDC config works."""
+    from app.config import encrypt
+    from app.models import Setting
+
+    _setup_and_login(client)
+
+    # GET before any config -> disabled
+    resp = client.get("/api/auth/oidc/config")
+    assert resp.status_code == 200
+    assert resp.json()["enabled"] is False
+
+    # PUT config with groups_claim
+    resp = client.put("/api/auth/oidc/config", json={
+        "issuer_url": "https://idp.example.com",
+        "client_id": "cid",
+        "client_secret": "csecret",
+        "groups_claim": "realm_roles",
+    })
+    assert resp.status_code == 200
+
+    # GET should return groups_claim
+    resp = client.get("/api/auth/oidc/config")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["enabled"] is True
+    assert data["groups_claim"] == "realm_roles"
