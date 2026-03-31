@@ -458,3 +458,303 @@ def test_oidc_callback_token_exchange_failure_returns_401(client: TestClient):
         )
     assert resp.status_code == 401
     assert resp.json()["detail"] == "oidc_callback_failed"
+
+
+# ---------------------------------------------------------------------------
+# RBAC helpers
+# ---------------------------------------------------------------------------
+
+USERS_URL = "/api/auth/users"
+
+
+def _admin_setup_and_login(client: TestClient) -> int:
+    """Create admin via /setup and return admin_id (client cookie is set)."""
+    resp = client.post(SETUP_URL, json=VALID_PAYLOAD)
+    assert resp.status_code == 201
+    admin_id = resp.json()["id"]
+    login_resp = client.post(LOGIN_URL, json=LOGIN_CREDS)
+    assert login_resp.status_code == 200
+    return admin_id
+
+
+def _create_user(client: TestClient, username: str = "testuser", role: str = "user"):
+    """Admin creates a new user and returns the raw response."""
+    return client.post(
+        USERS_URL,
+        json={"username": username, "display_name": "Test User", "password": "pass1234", "role": role},
+    )
+
+
+def _make_stream_and_profiles(db, count: int = 2):
+    """Create a Stream and `count` Profiles in the test DB. Returns (stream, profiles)."""
+    from app.models import Profile, Stream
+    stream = Stream(name="Test Stream", url="rtsp://localhost/test")
+    db.add(stream)
+    db.flush()
+    profiles = []
+    for i in range(count):
+        p = Profile(stream_id=stream.id, name=f"Profile {i+1}", interval_seconds=60)
+        db.add(p)
+        profiles.append(p)
+    db.flush()
+    return stream, profiles
+
+
+# ---------------------------------------------------------------------------
+# RBAC-01: Admin User Management
+# ---------------------------------------------------------------------------
+
+
+def test_admin_create_user(client: TestClient):
+    """Admin creates a user with role='user' -> 201 with correct fields."""
+    _admin_setup_and_login(client)
+    resp = _create_user(client, username="newuser")
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["username"] == "newuser"
+    assert data["role"] == "user"
+    assert data["is_active"] is True
+    assert "id" in data
+    assert "accessible_profile_ids" in data
+    assert "password_hash" not in data
+
+
+def test_admin_create_user_duplicate_username(client: TestClient):
+    """Creating a user with an existing username returns 409."""
+    _admin_setup_and_login(client)
+    _create_user(client, username="dupuser")
+    resp = _create_user(client, username="dupuser")
+    assert resp.status_code == 409
+    assert resp.json()["detail"] == "username_taken"
+
+
+def test_admin_list_users(client: TestClient):
+    """Admin GET /users returns all users including newly created ones."""
+    _admin_setup_and_login(client)
+    _create_user(client, username="user_a")
+    _create_user(client, username="user_b")
+    resp = client.get(USERS_URL)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert isinstance(data, list)
+    usernames = {u["username"] for u in data}
+    assert "admin" in usernames
+    assert "user_a" in usernames
+    assert "user_b" in usernames
+
+
+def test_admin_get_user(client: TestClient):
+    """Admin GET /users/{id} returns the user's details."""
+    _admin_setup_and_login(client)
+    user_id = _create_user(client, username="fetchme").json()["id"]
+    resp = client.get(f"{USERS_URL}/{user_id}")
+    assert resp.status_code == 200
+    assert resp.json()["username"] == "fetchme"
+
+
+def test_admin_update_user(client: TestClient):
+    """Admin PUT /users/{id} with new display_name -> 200, field updated."""
+    _admin_setup_and_login(client)
+    user_id = _create_user(client, username="updateme").json()["id"]
+    resp = client.put(f"{USERS_URL}/{user_id}", json={"display_name": "Updated Name"})
+    assert resp.status_code == 200
+    assert resp.json()["display_name"] == "Updated Name"
+
+
+def test_admin_update_user_password(client: TestClient):
+    """Admin changes a user password; user can log in with new password."""
+    _admin_setup_and_login(client)
+    _create_user(client, username="pwduser")
+    all_users = client.get(USERS_URL).json()
+    user_id = next(u["id"] for u in all_users if u["username"] == "pwduser")
+
+    resp = client.put(f"{USERS_URL}/{user_id}", json={"password": "newpass99"})
+    assert resp.status_code == 200
+
+    # Logout admin, login as pwduser with new password
+    client.post(LOGOUT_URL)
+    login_resp = client.post(LOGIN_URL, json={"username": "pwduser", "password": "newpass99"})
+    assert login_resp.status_code == 200
+
+
+def test_admin_disable_user(client: TestClient):
+    """Admin DELETE /users/{id} sets is_active=False and returns updated user."""
+    _admin_setup_and_login(client)
+    user_id = _create_user(client, username="disableme").json()["id"]
+    resp = client.delete(f"{USERS_URL}/{user_id}")
+    assert resp.status_code == 200
+    assert resp.json()["is_active"] is False
+
+
+def test_admin_cannot_disable_self(client: TestClient):
+    """Admin cannot disable themselves -> 400."""
+    admin_id = _admin_setup_and_login(client)
+    resp = client.delete(f"{USERS_URL}/{admin_id}")
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "cannot_disable_self"
+
+
+def test_nonadmin_cannot_access_user_management(client: TestClient):
+    """Non-admin user calls GET /users -> 403."""
+    _admin_setup_and_login(client)
+    _create_user(client, username="regular", role="user")
+    client.post(LOGOUT_URL)
+    client.post(LOGIN_URL, json={"username": "regular", "password": "pass1234"})
+    resp = client.get(USERS_URL)
+    assert resp.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# RBAC-02: Profile Access
+# ---------------------------------------------------------------------------
+
+
+def test_admin_set_profile_access(client: TestClient, db):
+    """Admin PUT /users/{id}/profiles sets profile access -> 200."""
+    _admin_setup_and_login(client)
+    user_id = _create_user(client, username="profuser").json()["id"]
+    _, profiles = _make_stream_and_profiles(db, count=2)
+    db.commit()
+
+    resp = client.put(
+        f"{USERS_URL}/{user_id}/profiles",
+        json={"profile_ids": [profiles[0].id, profiles[1].id]},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert set(data["profile_ids"]) == {profiles[0].id, profiles[1].id}
+
+
+def test_admin_get_profile_access(client: TestClient, db):
+    """Admin GET /users/{id}/profiles returns the set profile IDs."""
+    _admin_setup_and_login(client)
+    user_id = _create_user(client, username="profuser2").json()["id"]
+    _, profiles = _make_stream_and_profiles(db, count=3)
+    db.commit()
+
+    client.put(f"{USERS_URL}/{user_id}/profiles", json={"profile_ids": [profiles[0].id]})
+    resp = client.get(f"{USERS_URL}/{user_id}/profiles")
+    assert resp.status_code == 200
+    assert resp.json()["profile_ids"] == [profiles[0].id]
+
+
+def test_nonadmin_sees_only_permitted_profiles(client: TestClient, db):
+    """Non-admin sees only the profiles they have access to in list endpoint."""
+    _admin_setup_and_login(client)
+    user_id = _create_user(client, username="limiteduser").json()["id"]
+    stream, profiles = _make_stream_and_profiles(db, count=2)
+    db.commit()
+
+    client.put(f"{USERS_URL}/{user_id}/profiles", json={"profile_ids": [profiles[0].id]})
+
+    client.post(LOGOUT_URL)
+    client.post(LOGIN_URL, json={"username": "limiteduser", "password": "pass1234"})
+
+    resp = client.get(f"/api/streams/{stream.id}/profiles")
+    assert resp.status_code == 200
+    returned_ids = [p["id"] for p in resp.json()]
+    assert profiles[0].id in returned_ids
+    assert profiles[1].id not in returned_ids
+
+
+def test_nonadmin_denied_unpermitted_profile(client: TestClient, db):
+    """Non-admin GET /profiles/{unpermitted_id} -> 403."""
+    _admin_setup_and_login(client)
+    user_id = _create_user(client, username="limiteduser2").json()["id"]
+    _, profiles = _make_stream_and_profiles(db, count=2)
+    db.commit()
+
+    client.put(f"{USERS_URL}/{user_id}/profiles", json={"profile_ids": [profiles[0].id]})
+
+    client.post(LOGOUT_URL)
+    client.post(LOGIN_URL, json={"username": "limiteduser2", "password": "pass1234"})
+
+    resp = client.get(f"/api/profiles/{profiles[1].id}")
+    assert resp.status_code == 403
+
+
+def test_nonadmin_can_access_permitted_profile(client: TestClient, db):
+    """Non-admin GET /profiles/{permitted_id} -> 200."""
+    _admin_setup_and_login(client)
+    user_id = _create_user(client, username="permitteduser").json()["id"]
+    _, profiles = _make_stream_and_profiles(db, count=2)
+    db.commit()
+
+    client.put(f"{USERS_URL}/{user_id}/profiles", json={"profile_ids": [profiles[0].id]})
+
+    client.post(LOGOUT_URL)
+    client.post(LOGIN_URL, json={"username": "permitteduser", "password": "pass1234"})
+
+    resp = client.get(f"/api/profiles/{profiles[0].id}")
+    assert resp.status_code == 200
+    assert resp.json()["id"] == profiles[0].id
+
+
+def test_admin_sees_all_profiles(client: TestClient, db):
+    """Admin GET /streams/{id}/profiles returns all profiles regardless of access grants."""
+    _admin_setup_and_login(client)
+    stream, profiles = _make_stream_and_profiles(db, count=3)
+    db.commit()
+
+    resp = client.get(f"/api/streams/{stream.id}/profiles")
+    assert resp.status_code == 200
+    returned_ids = {p["id"] for p in resp.json()}
+    for p in profiles:
+        assert p.id in returned_ids
+
+
+def test_set_profile_access_invalid_profile(client: TestClient):
+    """PUT /users/{id}/profiles with non-existent profile_id -> 400."""
+    _admin_setup_and_login(client)
+    user_id = _create_user(client, username="accesstest").json()["id"]
+    resp = client.put(f"{USERS_URL}/{user_id}/profiles", json={"profile_ids": [99999]})
+    assert resp.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# Cascade behavior tests
+# ---------------------------------------------------------------------------
+
+
+def test_user_deletion_cascades_access(client: TestClient, db):
+    """Deleting a user removes their UserProfileAccess rows."""
+    from app.models import User, UserProfileAccess
+
+    _admin_setup_and_login(client)
+    user_id = _create_user(client, username="cascadeuser").json()["id"]
+    _, profiles = _make_stream_and_profiles(db, count=2)
+    db.commit()
+
+    client.put(f"{USERS_URL}/{user_id}/profiles", json={"profile_ids": [profiles[0].id]})
+
+    rows_before = db.query(UserProfileAccess).filter(UserProfileAccess.user_id == user_id).all()
+    assert len(rows_before) == 1
+
+    user = db.query(User).filter(User.id == user_id).first()
+    db.delete(user)
+    db.commit()
+
+    rows_after = db.query(UserProfileAccess).filter(UserProfileAccess.user_id == user_id).all()
+    assert len(rows_after) == 0
+
+
+def test_profile_deletion_cascades_access(client: TestClient, db):
+    """Deleting a profile removes associated UserProfileAccess rows."""
+    from app.models import Profile, UserProfileAccess
+
+    _admin_setup_and_login(client)
+    user_id = _create_user(client, username="profdel").json()["id"]
+    _, profiles = _make_stream_and_profiles(db, count=1)
+    db.commit()
+
+    client.put(f"{USERS_URL}/{user_id}/profiles", json={"profile_ids": [profiles[0].id]})
+
+    rows_before = db.query(UserProfileAccess).filter(UserProfileAccess.profile_id == profiles[0].id).all()
+    assert len(rows_before) == 1
+
+    profile = db.query(Profile).filter(Profile.id == profiles[0].id).first()
+    db.delete(profile)
+    db.commit()
+
+    rows_after = db.query(UserProfileAccess).filter(UserProfileAccess.profile_id == profiles[0].id).all()
+    assert len(rows_after) == 0
