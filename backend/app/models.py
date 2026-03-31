@@ -286,6 +286,42 @@ class UserProfileAccess(Base):
     profile_id: Mapped[int] = mapped_column(ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False)
 
 
+class Group(Base):
+    __tablename__ = "groups"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    role: Mapped[str] = mapped_column(Text, default="user", server_default="user")
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC))
+    updated_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
+    )
+
+    profile_access: Mapped[list["GroupProfileAccess"]] = relationship(
+        "GroupProfileAccess", cascade="all, delete-orphan"
+    )
+    oidc_mappings: Mapped[list["OIDCGroupMapping"]] = relationship(
+        "OIDCGroupMapping", cascade="all, delete-orphan"
+    )
+
+
+class GroupProfileAccess(Base):
+    __tablename__ = "group_profile_access"
+    __table_args__ = (UniqueConstraint("group_id", "profile_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"), nullable=False)
+    profile_id: Mapped[int] = mapped_column(ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False)
+
+
+class OIDCGroupMapping(Base):
+    __tablename__ = "oidc_group_mappings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    oidc_group_name: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"), nullable=False)
+
+
 class NotificationURL(Base):
     __tablename__ = "notification_urls"
 

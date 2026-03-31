@@ -594,6 +594,7 @@ class OIDCConfigRead(BaseModel):
     enabled: bool
     provider_name: str | None = None
     issuer_url: str | None = None
+    groups_claim: str | None = None
 
 
 class OIDCConfigUpdate(BaseModel):
@@ -601,6 +602,36 @@ class OIDCConfigUpdate(BaseModel):
     client_id: str
     client_secret: str
     provider_name: str | None = None
+    groups_claim: str | None = None
+
+
+# --- Groups (OIDC group mapping) ---
+
+
+class GroupCreate(BaseModel):
+    name: str
+    role: str = "user"
+    profile_ids: list[int] = []
+    oidc_group_names: list[str] = []
+
+
+class GroupUpdate(BaseModel):
+    name: str | None = None
+    role: str | None = None
+    profile_ids: list[int] | None = None
+    oidc_group_names: list[str] | None = None
+
+
+class GroupRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    role: str
+    profile_ids: list[int]
+    oidc_group_names: list[str]
+    created_at: datetime
+    updated_at: datetime
 
 
 # --- User management (RBAC) ---
