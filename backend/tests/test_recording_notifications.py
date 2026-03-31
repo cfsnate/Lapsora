@@ -234,10 +234,9 @@ class TestNotificationEventToggles(unittest.TestCase):
 class TestNotificationEventHandling(unittest.TestCase):
     """Test notification event handling and persistence."""
 
-    def test_recording_started_notification_persistence(self):
-        """Test that recording_started events are persisted to database."""
+    def test_recording_started_is_transient(self):
+        """Test that recording_started events are SSE-only (not persisted to database)."""
         async def run_test():
-            # Create a mock db session
             from sqlalchemy import create_engine
             from sqlalchemy.orm import sessionmaker
             from app.models import Base
@@ -248,8 +247,11 @@ class TestNotificationEventHandling(unittest.TestCase):
             db = Session()
             
             try:
-                with patch('app.services.notifications.sse_queues', []):
-                    with patch('app.services.notifications.SessionLocal', return_value=db):
+                mock_queue = AsyncMock()
+                sse_queues = [mock_queue]
+                
+                with patch('app.services.notifications.sse_queues', sse_queues):
+                    with patch('app.services.notifications._sse_lock'):
                         await handle_event(
                             "recording_started",
                             "Recording Started",
@@ -258,14 +260,14 @@ class TestNotificationEventHandling(unittest.TestCase):
                             {"profile_id": 1, "stream_id": 5}
                         )
                 
-                # Verify notification was created in database
+                # Verify SSE was pushed
+                mock_queue.put_nowait.assert_called_once()
+                
+                # Verify NOT persisted to database
                 notification = db.query(Notification).filter(
                     Notification.event_type == "recording_started"
                 ).first()
-                self.assertIsNotNone(notification)
-                self.assertEqual(notification.title, "Recording Started")
-                self.assertEqual(notification.body, "Profile 1 recording started")
-                self.assertEqual(notification.level, "info")
+                self.assertIsNone(notification)
             finally:
                 db.close()
         
@@ -308,41 +310,27 @@ class TestNotificationEventHandling(unittest.TestCase):
         asyncio.run(run_test())
 
     def test_sse_broadcast_for_recording_events(self):
-        """Test that recording events are broadcast to SSE queues."""
+        """Test that transient recording events are broadcast to SSE queues."""
         async def run_test():
-            # Create a mock db session
-            from sqlalchemy import create_engine
-            from sqlalchemy.orm import sessionmaker
-            from app.models import Base
+            mock_queue = AsyncMock()
+            sse_queues = [mock_queue]
             
-            engine = create_engine("sqlite:///:memory:")
-            Base.metadata.create_all(bind=engine)
-            Session = sessionmaker(bind=engine)
-            db = Session()
+            with patch('app.services.notifications.sse_queues', sse_queues):
+                with patch('app.services.notifications._sse_lock'):
+                    await handle_event(
+                        "recording_stopped",
+                        "Recording Stopped",
+                        "Profile 3 recording stopped",
+                        "info",
+                        {"profile_id": 3, "duration_seconds": 120.5}
+                    )
             
-            try:
-                mock_queue = AsyncMock()
-                sse_queues = [mock_queue]
-                
-                with patch('app.services.notifications.sse_queues', sse_queues):
-                    with patch('app.services.notifications._sse_lock'):
-                        with patch('app.services.notifications.SessionLocal', return_value=db):
-                            await handle_event(
-                                "recording_stopped",
-                                "Recording Stopped",
-                                "Profile 3 recording stopped",
-                                "info",
-                                {"profile_id": 3, "duration_seconds": 120.5}
-                            )
-                
-                # Verify SSE data was queued
-                mock_queue.put_nowait.assert_called_once()
-                sse_data = json.loads(mock_queue.put_nowait.call_args[0][0])
-                self.assertEqual(sse_data['event_type'], "recording_stopped")
-                self.assertEqual(sse_data['title'], "Recording Stopped")
-                self.assertEqual(sse_data['level'], "info")
-            finally:
-                db.close()
+            # Verify SSE data was queued (transient format)
+            mock_queue.put_nowait.assert_called_once()
+            sse_data = json.loads(mock_queue.put_nowait.call_args[0][0])
+            self.assertEqual(sse_data['event_type'], "recording_stopped")
+            self.assertEqual(sse_data['profile_id'], 3)
+            self.assertEqual(sse_data['duration_seconds'], 120.5)
         
         asyncio.run(run_test())
 
@@ -389,7 +377,7 @@ class TestNotificationEventHandling(unittest.TestCase):
         asyncio.run(run_test())
 
     def test_apprise_notification_skipped_when_disabled(self):
-        """Test that recording events skip Apprise when toggle is disabled."""
+        """Test that persistent recording events skip Apprise when toggle is disabled."""
         async def run_test():
             # Create a mock db session
             from sqlalchemy import create_engine
@@ -402,9 +390,9 @@ class TestNotificationEventHandling(unittest.TestCase):
             db = Session()
             
             try:
-                # Set up event toggles with recording_started disabled
+                # Set up event toggles with recording_failed disabled
                 custom_toggles = DEFAULT_EVENT_TOGGLES.copy()
-                custom_toggles['recording_started'] = False
+                custom_toggles['recording_failed'] = False
                 setting = Setting(key="notification_events", value=json.dumps(custom_toggles))
                 db.add(setting)
                 db.commit()
@@ -413,10 +401,10 @@ class TestNotificationEventHandling(unittest.TestCase):
                     with patch('app.services.notifications.SessionLocal', return_value=db):
                         with patch('asyncio.to_thread', new_callable=AsyncMock) as mock_to_thread:
                             await handle_event(
-                                "recording_started",
-                                "Recording Started", 
-                                "Profile recording started",
-                                "info",
+                                "recording_failed",
+                                "Recording Failed", 
+                                "Profile recording failed",
+                                "error",
                                 {"profile_id": 5}
                             )
                         

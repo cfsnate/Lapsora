@@ -53,7 +53,8 @@ async def handle_event(event_type: str, title: str, body: str, level: str = "inf
 
     # Transient progress events: push to SSE only, no DB persistence or Apprise
     transient_events = {"timelapse_progress", "timelapse_queued", "timelapse_queue_updated",
-                        "timelapse_cancelled", "recording_status"}
+                        "timelapse_cancelled", "recording_status",
+                        "recording_started", "recording_stopped"}
     if event_type in transient_events:
         sse_data = json.dumps({"event_type": event_type, **(data or {})})
         with _sse_lock:
