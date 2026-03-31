@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import check_profile_access, get_accessible_profile_ids, get_current_user
 from app.models import CleanupSchedule, Profile, User
 from app.schemas import (
     CleanupScheduleCreate,
@@ -55,11 +55,21 @@ def _schedule_to_read(schedule: CleanupSchedule) -> dict:
 @router.get("/", response_model=list[CleanupScheduleRead])
 def list_cleanup_schedules(
     profile_id: int | None = None,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     stmt = select(CleanupSchedule).order_by(CleanupSchedule.created_at.desc())
+
     if profile_id is not None:
+        check_profile_access(current_user, profile_id, db)
         stmt = stmt.where(CleanupSchedule.profile_id == profile_id)
+    else:
+        accessible_ids = get_accessible_profile_ids(current_user, db)
+        if accessible_ids is not None:
+            if len(accessible_ids) == 0:
+                return []
+            stmt = stmt.where(CleanupSchedule.profile_id.in_(accessible_ids))
+
     schedules = db.execute(stmt).scalars().all()
     return [_schedule_to_read(s) for s in schedules]
 
@@ -67,8 +77,11 @@ def list_cleanup_schedules(
 @router.post("/", response_model=CleanupScheduleRead, status_code=201)
 def create_cleanup_schedule(
     body: CleanupScheduleCreate,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    check_profile_access(current_user, body.profile_id, db)
+
     profile = db.get(Profile, body.profile_id)
     if not profile:
         raise HTTPException(404, "Profile not found")
@@ -97,11 +110,14 @@ def create_cleanup_schedule(
 def update_cleanup_schedule(
     schedule_id: int,
     body: CleanupScheduleUpdate,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     schedule = db.get(CleanupSchedule, schedule_id)
     if not schedule:
         raise HTTPException(404, "Schedule not found")
+
+    check_profile_access(current_user, schedule.profile_id, db)
 
     updates = body.model_dump(exclude_unset=True)
 
@@ -124,11 +140,14 @@ def update_cleanup_schedule(
 @router.delete("/{schedule_id}", status_code=204)
 def delete_cleanup_schedule(
     schedule_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     schedule = db.get(CleanupSchedule, schedule_id)
     if not schedule:
         raise HTTPException(404, "Schedule not found")
+
+    check_profile_access(current_user, schedule.profile_id, db)
 
     remove_cleanup_schedule_job(schedule.id)
     db.delete(schedule)
@@ -139,11 +158,14 @@ def delete_cleanup_schedule(
 async def trigger_cleanup_schedule(
     schedule_id: int,
     background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     schedule = db.get(CleanupSchedule, schedule_id)
     if not schedule:
         raise HTTPException(404, "Schedule not found")
+
+    check_profile_access(current_user, schedule.profile_id, db)
 
     from app.services.retention import run_profile_cleanup
 

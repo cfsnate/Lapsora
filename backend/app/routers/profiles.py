@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import check_profile_access, get_accessible_profile_ids, get_current_user, require_admin
 from app.models import Profile, Stream, User
 from app.schemas import ProfileCreate, ProfileRead, ProfileUpdate
 from app.services import scheduler
@@ -20,15 +20,19 @@ router = APIRouter(prefix="/api", tags=["profiles"], dependencies=[Depends(get_c
 
 
 @router.get("/streams/{stream_id}/profiles", response_model=list[ProfileRead])
-def list_profiles(stream_id: int, db: Session = Depends(get_db)):
+def list_profiles(stream_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     stream = db.get(Stream, stream_id)
     if not stream:
         raise HTTPException(404, "Stream not found")
-    return db.query(Profile).filter(Profile.stream_id == stream_id).all()
+    q = db.query(Profile).filter(Profile.stream_id == stream_id)
+    accessible_ids = get_accessible_profile_ids(current_user, db)
+    if accessible_ids is not None:
+        q = q.filter(Profile.id.in_(accessible_ids))
+    return q.all()
 
 
 @router.post("/streams/{stream_id}/profiles", response_model=ProfileRead, status_code=201)
-def create_profile(stream_id: int, body: ProfileCreate, db: Session = Depends(get_db)):
+def create_profile(stream_id: int, body: ProfileCreate, current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
     stream = db.get(Stream, stream_id)
     if not stream:
         raise HTTPException(404, "Stream not found")
@@ -45,18 +49,20 @@ def create_profile(stream_id: int, body: ProfileCreate, db: Session = Depends(ge
 
 
 @router.get("/profiles/{profile_id}", response_model=ProfileRead)
-def get_profile(profile_id: int, db: Session = Depends(get_db)):
+def get_profile(profile_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     profile = db.get(Profile, profile_id)
     if not profile:
         raise HTTPException(404, "Profile not found")
+    check_profile_access(current_user, profile_id, db)
     return profile
 
 
 @router.put("/profiles/{profile_id}", response_model=ProfileRead)
-async def update_profile(profile_id: int, body: ProfileUpdate, db: Session = Depends(get_db)):
+async def update_profile(profile_id: int, body: ProfileUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     profile = db.get(Profile, profile_id)
     if not profile:
         raise HTTPException(404, "Profile not found")
+    check_profile_access(current_user, profile_id, db)
 
     update_data = body.model_dump(exclude_unset=True)
     needs_reschedule = any(
@@ -98,10 +104,11 @@ async def update_profile(profile_id: int, body: ProfileUpdate, db: Session = Dep
 
 
 @router.delete("/profiles/{profile_id}", status_code=204)
-async def delete_profile(profile_id: int, db: Session = Depends(get_db)):
+async def delete_profile(profile_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     profile = db.get(Profile, profile_id)
     if not profile:
         raise HTTPException(404, "Profile not found")
+    check_profile_access(current_user, profile_id, db)
 
     scheduler.remove_capture_job(profile.id)
 
@@ -121,10 +128,11 @@ async def delete_profile(profile_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/profiles/{profile_id}/enable", response_model=ProfileRead)
-def enable_profile(profile_id: int, db: Session = Depends(get_db)):
+def enable_profile(profile_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     profile = db.get(Profile, profile_id)
     if not profile:
         raise HTTPException(404, "Profile not found")
+    check_profile_access(current_user, profile_id, db)
 
     profile.enabled = True
     db.commit()
@@ -135,10 +143,11 @@ def enable_profile(profile_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/profiles/{profile_id}/disable", response_model=ProfileRead)
-def disable_profile(profile_id: int, db: Session = Depends(get_db)):
+def disable_profile(profile_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     profile = db.get(Profile, profile_id)
     if not profile:
         raise HTTPException(404, "Profile not found")
+    check_profile_access(current_user, profile_id, db)
 
     profile.enabled = False
     db.commit()

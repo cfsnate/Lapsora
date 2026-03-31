@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import check_profile_access, get_accessible_profile_ids, get_current_user
 from app.models import Profile, TimelapseSchedule, User
 from app.schemas import (
     TimelapseScheduleCreate,
@@ -66,11 +66,21 @@ def _schedule_to_read(schedule: TimelapseSchedule) -> dict:
 @router.get("/", response_model=list[TimelapseScheduleRead])
 def list_schedules(
     profile_id: int | None = None,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     stmt = select(TimelapseSchedule).order_by(TimelapseSchedule.created_at.desc())
+
     if profile_id is not None:
+        check_profile_access(current_user, profile_id, db)
         stmt = stmt.where(TimelapseSchedule.profile_id == profile_id)
+    else:
+        accessible_ids = get_accessible_profile_ids(current_user, db)
+        if accessible_ids is not None:
+            if len(accessible_ids) == 0:
+                return []
+            stmt = stmt.where(TimelapseSchedule.profile_id.in_(accessible_ids))
+
     schedules = db.execute(stmt).scalars().all()
     return [_schedule_to_read(s) for s in schedules]
 
@@ -78,8 +88,11 @@ def list_schedules(
 @router.post("/", response_model=TimelapseScheduleRead, status_code=201)
 def create_schedule(
     body: TimelapseScheduleCreate,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    check_profile_access(current_user, body.profile_id, db)
+
     # Validate profile exists
     profile = db.get(Profile, body.profile_id)
     if not profile:
@@ -134,11 +147,14 @@ def create_schedule(
 def update_schedule(
     schedule_id: int,
     body: TimelapseScheduleUpdate,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     schedule = db.get(TimelapseSchedule, schedule_id)
     if not schedule:
         raise HTTPException(404, "Schedule not found")
+
+    check_profile_access(current_user, schedule.profile_id, db)
 
     updates = body.model_dump(exclude_unset=True)
 
@@ -170,11 +186,14 @@ def update_schedule(
 @router.delete("/{schedule_id}", status_code=204)
 def delete_schedule(
     schedule_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     schedule = db.get(TimelapseSchedule, schedule_id)
     if not schedule:
         raise HTTPException(404, "Schedule not found")
+
+    check_profile_access(current_user, schedule.profile_id, db)
 
     remove_timelapse_schedule_job(schedule.id)
     db.delete(schedule)
@@ -184,11 +203,14 @@ def delete_schedule(
 @router.post("/{schedule_id}/trigger", status_code=202)
 async def trigger_schedule(
     schedule_id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     schedule = db.get(TimelapseSchedule, schedule_id)
     if not schedule:
         raise HTTPException(404, "Schedule not found")
+
+    check_profile_access(current_user, schedule.profile_id, db)
 
     from datetime import UTC, datetime, timedelta
 

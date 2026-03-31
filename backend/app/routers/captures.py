@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import check_profile_access, get_current_user
 from app.models import Capture, User
 from app.schemas import BulkDeleteRequest, CaptureRead
 
@@ -20,8 +20,11 @@ def list_captures(
     profile_id: int,
     limit: int = Query(default=50, le=1000),
     offset: int = 0,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    check_profile_access(current_user, profile_id, db)
+
     return (
         db.query(Capture)
         .filter(Capture.profile_id == profile_id)

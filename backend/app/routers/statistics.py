@@ -7,7 +7,8 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import check_profile_access, get_accessible_profile_ids, get_current_user
+from app.models import User
 from app.schemas import (
     CaptureActivityPoint,
     ProfileStoragePoint,
@@ -23,19 +24,39 @@ router = APIRouter(prefix="/api/statistics", tags=["statistics"], dependencies=[
 
 
 @router.get("/summary", response_model=StatsSummary)
-def get_summary(db: Session = Depends(get_db)):
+def get_summary(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    accessible_ids = get_accessible_profile_ids(current_user, db)
+
+    if accessible_ids is None:
+        # Admin: no filter
+        profile_filter = ""
+        params: dict = {}
+    elif len(accessible_ids) == 0:
+        # Non-admin with no access: return zeroed summary
+        return StatsSummary(
+            total_captures=0,
+            avg_captures_per_day=0.0,
+            avg_bytes_per_day=0.0,
+            days_until_full=None,
+        )
+    else:
+        placeholders = ",".join(str(i) for i in accessible_ids)
+        profile_filter = f"AND profile_id IN ({placeholders})"
+        params = {}
+
     row = db.execute(
         text(
-            """
+            f"""
             SELECT
                 COUNT(*) AS total,
                 MIN(date(captured_at)) AS first_date,
                 MAX(date(captured_at)) AS last_date,
                 COALESCE(SUM(file_size), 0) AS total_bytes
             FROM captures
-            WHERE file_size IS NOT NULL
+            WHERE file_size IS NOT NULL {profile_filter}
             """
-        )
+        ),
+        params,
     ).one()
 
     total_captures = row.total
@@ -60,15 +81,15 @@ def get_summary(db: Session = Depends(get_db)):
         seven_days_ago = (date.today() - timedelta(days=7)).isoformat()
         recent = db.execute(
             text(
-                """
+                f"""
                 SELECT COALESCE(SUM(file_size), 0) AS bytes_7d
                 FROM captures
-                WHERE file_size IS NOT NULL AND date(captured_at) >= :cutoff
+                WHERE file_size IS NOT NULL AND date(captured_at) >= :cutoff {profile_filter}
                 """
             ),
             {"cutoff": seven_days_ago},
         ).one()
-        # Also count timelapse bytes
+        # Also count timelapse bytes (not filtered by profile for disk-full estimate)
         recent_tl = db.execute(
             text(
                 """
@@ -152,15 +173,26 @@ def get_storage_trend(
 def get_capture_activity(
     days: int = Query(30, ge=1, le=365),
     profile_id: int | None = Query(None),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     cutoff = (date.today() - timedelta(days=days)).isoformat()
     params: dict = {"cutoff": cutoff}
 
-    profile_filter = ""
     if profile_id is not None:
+        # Explicit profile requested — check access
+        check_profile_access(current_user, profile_id, db)
         profile_filter = "AND profile_id = :profile_id"
         params["profile_id"] = profile_id
+    else:
+        accessible_ids = get_accessible_profile_ids(current_user, db)
+        if accessible_ids is None:
+            profile_filter = ""
+        elif len(accessible_ids) == 0:
+            return []
+        else:
+            placeholders = ",".join(str(i) for i in accessible_ids)
+            profile_filter = f"AND profile_id IN ({placeholders})"
 
     rows = db.execute(
         text(
@@ -185,15 +217,25 @@ def get_capture_activity(
 def get_profile_storage(
     days: int = Query(30, ge=1, le=365),
     profile_id: int | None = Query(None),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     cutoff = (date.today() - timedelta(days=days)).isoformat()
     params: dict = {"cutoff": cutoff}
 
-    profile_filter = ""
     if profile_id is not None:
+        check_profile_access(current_user, profile_id, db)
         profile_filter = "AND profile_id = :profile_id"
         params["profile_id"] = profile_id
+    else:
+        accessible_ids = get_accessible_profile_ids(current_user, db)
+        if accessible_ids is None:
+            profile_filter = ""
+        elif len(accessible_ids) == 0:
+            return []
+        else:
+            placeholders = ",".join(str(i) for i in accessible_ids)
+            profile_filter = f"AND profile_id IN ({placeholders})"
 
     rows = db.execute(
         text(

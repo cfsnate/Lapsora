@@ -7,7 +7,7 @@ from sqlalchemy import func, or_, update
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import check_profile_access, get_accessible_profile_ids, get_current_user, require_admin
 from app.models import RecordingSegment, User
 from app.schemas import ProtectRequest, ProtectResponse
 
@@ -17,24 +17,40 @@ router = APIRouter(prefix="/api/recording", tags=["recording"], dependencies=[De
 
 
 @router.get("/status")
-def get_recording_statuses():
-    """Return recording status for all active recording processes."""
+def get_recording_statuses(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Return recording status for all active recording processes (filtered by access for non-admins)."""
     from app.services.recording import recording_manager
 
-    return recording_manager.get_all_statuses()
+    all_statuses = recording_manager.get_all_statuses()
+
+    accessible_ids = get_accessible_profile_ids(current_user, db)
+    if accessible_ids is None:
+        return all_statuses
+
+    # all_statuses is a dict keyed by profile_id (int or str); filter to accessible
+    if isinstance(all_statuses, dict):
+        return {k: v for k, v in all_statuses.items() if int(k) in accessible_ids}
+    # If it's a list, filter by profile_id field
+    if isinstance(all_statuses, list):
+        return [s for s in all_statuses if s.get("profile_id") in accessible_ids]
+    return all_statuses
 
 
 @router.get("/status/{profile_id}")
-def get_recording_status(profile_id: int):
+def get_recording_status(profile_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Return recording status for a specific profile."""
+    check_profile_access(current_user, profile_id, db)
+
     from app.services.recording import recording_manager
 
     return recording_manager.get_status(profile_id)
 
 
 @router.post("/{profile_id}/protect", response_model=ProtectResponse)
-def protect_segments(profile_id: int, body: ProtectRequest, db: Session = Depends(get_db)):
+def protect_segments(profile_id: int, body: ProtectRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Mark all overlapping segments as protected."""
+    check_profile_access(current_user, profile_id, db)
+
     stmt = (
         update(RecordingSegment)
         .where(
@@ -53,8 +69,10 @@ def protect_segments(profile_id: int, body: ProtectRequest, db: Session = Depend
 
 
 @router.post("/{profile_id}/unprotect", response_model=ProtectResponse)
-def unprotect_segments(profile_id: int, body: ProtectRequest, db: Session = Depends(get_db)):
+def unprotect_segments(profile_id: int, body: ProtectRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Clear protection on all overlapping segments."""
+    check_profile_access(current_user, profile_id, db)
+
     stmt = (
         update(RecordingSegment)
         .where(
@@ -73,8 +91,10 @@ def unprotect_segments(profile_id: int, body: ProtectRequest, db: Session = Depe
 
 
 @router.get("/{profile_id}/segments/summary")
-def get_segments_summary(profile_id: int, db: Session = Depends(get_db)):
+def get_segments_summary(profile_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Return a summary of recording segments for a profile."""
+    check_profile_access(current_user, profile_id, db)
+
     row = db.query(
         func.count(RecordingSegment.id).label("count"),
         func.coalesce(func.sum(RecordingSegment.file_size), 0).label("total_bytes"),
@@ -96,12 +116,14 @@ def get_segments_summary(profile_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{profile_id}/segments/verify")
-async def verify_segments(profile_id: int, db: Session = Depends(get_db)):
+async def verify_segments(profile_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Re-probe all segments and compare ffprobe duration vs DB duration.
     
     Returns a list of segments with their DB-stored duration and the
     freshly-probed duration, plus a mismatch flag.
     """
+    check_profile_access(current_user, profile_id, db)
+
     import os
     from app.config import settings
     from app.services.recording import _get_segment_duration
@@ -153,10 +175,10 @@ async def verify_segments(profile_id: int, db: Session = Depends(get_db)):
 
 
 @router.delete("/all", status_code=200)
-async def delete_all_recordings(db: Session = Depends(get_db)):
+async def delete_all_recordings(current_user: User = Depends(require_admin), db: Session = Depends(get_db)):
     """Delete ALL recording segments from database and disk. Destructive and irreversible.
     
-    Stops all active recording processes, deletes all segment files,
+    Admin-only. Stops all active recording processes, deletes all segment files,
     removes DB records, and restarts recording for enabled profiles.
     """
     import os

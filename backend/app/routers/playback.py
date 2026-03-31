@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import check_profile_access, get_current_user
 from app.models import RecordingSegment, User
 from app.services.playback import generate_playlist, get_availability_ranges
 
@@ -22,8 +22,11 @@ def get_playlist(
     profile_id: int,
     start: datetime = Query(...),
     end: datetime = Query(...),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    check_profile_access(current_user, profile_id, db)
+
     playlist = generate_playlist(db, profile_id, start, end)
     if not playlist:
         # Return an empty VOD playlist rather than 404 — HLS.js treats 404 as fatal
@@ -35,10 +38,13 @@ def get_playlist(
 
 
 @router.get("/segment/{segment_id}")
-def get_segment(segment_id: int, request: Request, db: Session = Depends(get_db)):
+def get_segment(segment_id: int, request: Request, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     segment = db.get(RecordingSegment, segment_id)
     if not segment:
         raise HTTPException(status_code=404, detail="Segment not found")
+
+    # Check access via the segment's profile
+    check_profile_access(current_user, segment.profile_id, db)
 
     abs_path = os.path.join(settings.DATA_DIR, segment.file_path)
     if not os.path.isfile(abs_path):
@@ -102,8 +108,11 @@ def get_availability(
     profile_id: int,
     date: str = Query(...),
     days: int = Query(default=1),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    check_profile_access(current_user, profile_id, db)
+
     day_start = datetime.strptime(date, "%Y-%m-%d").replace(tzinfo=UTC)
     day_end = day_start + timedelta(days=days)
     return get_availability_ranges(db, profile_id, day_start, day_end)
