@@ -61,7 +61,6 @@ def recording_rel(profile: Profile, fname: str) -> str:
 
 
 BACKOFF_SCHEDULE = [0, 5, 10, 30, 60]
-MIN_SEGMENT_SIZE = 1024
 
 
 def resolve_recording_url(stream: Stream, db) -> str:
@@ -483,53 +482,73 @@ def _parse_segment_timestamp(filename: str) -> datetime:
 
 
 async def scan_segments() -> None:
-    """Periodic job that discovers new .ts segment files and registers them in the database."""
+    """Periodic job that discovers new .ts segment files and registers them in the database.
+
+    Two-pass approach:
+    1. New files above MIN_SEGMENT_SIZE are registered immediately — even while
+       still being written — with duration_seconds=NULL so the timeline shows them.
+    2. Once a file is older than 30s (FFmpeg has moved on), we probe it with ffprobe
+       and fill in the real duration and end_time.
+    """
     db = SessionLocal()
     try:
         profiles = db.query(Profile).filter(Profile.recording_enabled.is_(True)).all()
         now = datetime.now(UTC)
-        cutoff = now - timedelta(seconds=30)
+        stable_cutoff = now - timedelta(seconds=30)
 
         for profile in profiles:
             output_dir = recording_dir(profile)
             if not os.path.isdir(output_dir):
                 continue
 
-            known_paths = set(
-                r[0]
-                for r in db.query(RecordingSegment.file_path)
+            # Map known segments by file_path for quick lookup + update
+            existing = {
+                seg.file_path: seg
+                for seg in db.query(RecordingSegment)
                 .filter(RecordingSegment.profile_id == profile.id)
                 .all()
-            )
+            }
 
             for fname in os.listdir(output_dir):
                 if not fname.endswith(".ts"):
                     continue
                 fpath = os.path.join(output_dir, fname)
                 rel_path = recording_rel(profile, fname)
-                if rel_path in known_paths:
+
+                try:
+                    stat = os.stat(fpath)
+                except OSError:
                     continue
-                stat = os.stat(fpath)
                 if stat.st_size < MIN_SEGMENT_SIZE:
                     continue
+
                 mtime = datetime.fromtimestamp(stat.st_mtime, tz=UTC)
-                if mtime > cutoff:
-                    continue
+                is_stable = mtime <= stable_cutoff
 
-                duration = await _get_segment_duration(fpath)
-                start_time = _parse_segment_timestamp(fname)
+                if rel_path not in existing:
+                    # Register immediately — duration is NULL for in-progress segments
+                    start_time = _parse_segment_timestamp(fname)
+                    duration = await _get_segment_duration(fpath) if is_stable else None
 
-                segment = RecordingSegment(
-                    profile_id=profile.id,
-                    file_path=rel_path,
-                    file_size=stat.st_size,
-                    duration_seconds=duration,
-                    start_time=start_time,
-                    end_time=start_time + timedelta(seconds=duration) if duration else None,
-                )
-                db.add(segment)
+                    segment = RecordingSegment(
+                        profile_id=profile.id,
+                        file_path=rel_path,
+                        file_size=stat.st_size,
+                        duration_seconds=duration,
+                        start_time=start_time,
+                        end_time=start_time + timedelta(seconds=duration) if duration else None,
+                    )
+                    db.add(segment)
+                    recording_manager.on_segment_produced(profile.id)
 
-                recording_manager.on_segment_produced(profile.id)
+                elif is_stable and existing[rel_path].duration_seconds is None:
+                    # Backfill: file is now stable, probe real duration
+                    seg = existing[rel_path]
+                    duration = await _get_segment_duration(fpath)
+                    if duration is not None:
+                        seg.duration_seconds = duration
+                        seg.end_time = seg.start_time + timedelta(seconds=duration)
+                        seg.file_size = stat.st_size
 
         db.commit()
     except Exception:

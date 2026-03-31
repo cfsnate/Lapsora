@@ -69,7 +69,7 @@ class ProfileCreate(BaseModel):
     recording_end_time: str | None = None
     recording_sun_offset_minutes: int = Field(default=0, ge=0, le=180)
     recording_sun_events: str = ""
-    segment_duration_seconds: int = Field(default=600, ge=30, le=3600)
+    segment_duration_seconds: int = Field(default=300, ge=30, le=3600)
     recording_storage_path: str | None = None
     recording_days: str = ""
     recording_retention_days: int | None = None

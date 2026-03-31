@@ -76,7 +76,7 @@ class Profile(Base):
     recording_end_time: Mapped[str | None] = mapped_column(Text, nullable=True)
     recording_sun_offset_minutes: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     recording_sun_events: Mapped[str] = mapped_column(Text, default="", server_default="")
-    segment_duration_seconds: Mapped[int] = mapped_column(Integer, default=600, server_default="600")
+    segment_duration_seconds: Mapped[int] = mapped_column(Integer, default=300, server_default="300")
     recording_storage_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     recording_days: Mapped[str] = mapped_column(Text, default="", server_default="")
     recording_retention_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
