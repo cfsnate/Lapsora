@@ -475,11 +475,13 @@ async def _get_segment_duration(path: str) -> float | None:
 def _parse_segment_timestamp(filename: str) -> datetime:
     """Extract datetime from segment filename pattern YYYYMMDD_HHMMSS.ts.
 
-    FFmpeg runs with TZ=UTC in the container, so filenames are UTC timestamps.
+    FFmpeg's -strftime uses the system clock, which follows the container's
+    timezone. Parse as local time and convert to UTC for consistent storage.
     """
     name = os.path.splitext(filename)[0]
     try:
-        return datetime.strptime(name, "%Y%m%d_%H%M%S").replace(tzinfo=UTC)
+        local_dt = datetime.strptime(name, "%Y%m%d_%H%M%S")
+        return local_dt.astimezone(UTC)
     except ValueError:
         return datetime.now(UTC)
 
