@@ -177,12 +177,22 @@ async def serve_live_hls(stream_id: int, filename: str):
     live_hls_manager.touch(stream_id)
 
     file_path = os.path.join(settings.DATA_DIR, "live", str(stream_id), filename)
-    if not os.path.exists(file_path):
-        raise HTTPException(404, "File not found")
 
     if filename.endswith(".m3u8"):
-        # Read and return as bytes so we snapshot the file at request time
-        # (FFmpeg is actively writing it). No-cache so HLS.js always polls fresh.
+        if not os.path.exists(file_path):
+            # FFmpeg hasn't written the playlist yet — return a valid empty live
+            # playlist so HLS.js keeps polling rather than fataling on 404.
+            empty_playlist = (
+                "#EXTM3U\n"
+                "#EXT-X-VERSION:3\n"
+                f"#EXT-X-TARGETDURATION:{2}\n"
+                "#EXT-X-MEDIA-SEQUENCE:0\n"
+            )
+            return Response(
+                content=empty_playlist.encode(),
+                media_type="application/vnd.apple.mpegurl",
+                headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+            )
         try:
             with open(file_path, "rb") as f:
                 content = f.read()
@@ -191,12 +201,11 @@ async def serve_live_hls(stream_id: int, filename: str):
         return Response(
             content=content,
             media_type="application/vnd.apple.mpegurl",
-            headers={
-                "Cache-Control": "no-cache, no-store, must-revalidate",
-                "Pragma": "no-cache",
-            },
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache"},
         )
     elif filename.endswith(".ts"):
+        if not os.path.exists(file_path):
+            raise HTTPException(404, "File not found")
         return FileResponse(
             file_path,
             media_type="video/mp2t",

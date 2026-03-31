@@ -154,12 +154,16 @@
 				});
 				instance.on(Hls.Events.ERROR, (_event, data) => {
 					if (data.fatal) {
+						if (isLiveHls && data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+							// During live startup the playlist may return 200 with no segments yet.
+							// Recover by restarting the load rather than hard-failing.
+							instance.startLoad();
+							return;
+						}
 						status = 'error';
 						errorMsg = data.details || 'HLS playback failed';
 						onError?.(data.details || 'HLS playback failed');
 					}
-					// Non-fatal network errors during live HLS startup are expected —
-					// HLS.js will retry automatically, no action needed
 				});
 				hlsInstance = instance;
 
