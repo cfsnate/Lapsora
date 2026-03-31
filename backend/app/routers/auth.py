@@ -1,14 +1,24 @@
-"""Auth endpoints — setup wizard and setup status."""
+"""Auth endpoints — setup wizard, login, logout, and current user."""
+
+from datetime import UTC, datetime, timedelta
 
 import bcrypt
-from fastapi import APIRouter, Depends, HTTPException
+import jwt
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_db
+from app.dependencies import get_current_user
 from app.models import User
-from app.schemas import SetupCreate, SetupStatusResponse, UserRead
+from app.schemas import LoginRequest, SetupCreate, SetupStatusResponse, UserRead
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+
+# ---------------------------------------------------------------------------
+# Setup (unauthenticated)
+# ---------------------------------------------------------------------------
 
 
 @router.get("/setup-status", response_model=SetupStatusResponse)
@@ -41,3 +51,72 @@ def run_setup(payload: SetupCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
     return user
+
+
+# ---------------------------------------------------------------------------
+# Login / Logout
+# ---------------------------------------------------------------------------
+
+
+@router.post("/login", response_model=UserRead)
+def login(payload: LoginRequest, response: Response, db: Session = Depends(get_db)):
+    """Verify credentials, issue JWT in httpOnly cookie, return UserRead."""
+    user = db.query(User).filter(User.username == payload.username).first()
+    if user is None:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    try:
+        valid = bcrypt.checkpw(
+            payload.password.encode("utf-8"),
+            user.password_hash.encode("utf-8"),
+        )
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    if not valid:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    if not user.is_active:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    exp = datetime.now(UTC) + timedelta(hours=settings.JWT_EXPIRY_HOURS)
+    token = jwt.encode(
+        {"sub": str(user.id), "exp": exp},
+        settings.SECRET_KEY,
+        algorithm=settings.JWT_ALGORITHM,
+    )
+
+    response.set_cookie(
+        key="access_token",
+        value=token,
+        httponly=True,
+        samesite="lax",
+        path="/",
+        max_age=settings.JWT_EXPIRY_HOURS * 3600,
+    )
+    return user
+
+
+@router.post("/logout")
+def logout(response: Response):
+    """Clear the access_token cookie."""
+    response.set_cookie(
+        key="access_token",
+        value="",
+        httponly=True,
+        samesite="lax",
+        path="/",
+        max_age=0,
+    )
+    return {"detail": "logged_out"}
+
+
+# ---------------------------------------------------------------------------
+# Current user
+# ---------------------------------------------------------------------------
+
+
+@router.get("/me", response_model=UserRead)
+def me(current_user: User = Depends(get_current_user)):
+    """Return the currently authenticated user."""
+    return current_user

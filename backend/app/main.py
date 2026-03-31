@@ -87,8 +87,8 @@ app = FastAPI(title="Lapsora", version="0.1.0", lifespan=lifespan)
 # CORS for development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origin_regex=r".*",
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )

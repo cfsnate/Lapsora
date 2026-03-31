@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     SECRET_KEY: str = ""
     DATA_DIR: str = "data"
     DATABASE_URL: str = "sqlite:///data/lapsora.db"
+    JWT_EXPIRY_HOURS: int = 24
+    JWT_ALGORITHM: str = "HS256"
 
     def model_post_init(self, __context: object) -> None:
         if not self.SECRET_KEY:

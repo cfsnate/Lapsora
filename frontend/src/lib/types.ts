@@ -180,6 +180,7 @@ export interface Timelapse {
 	period_type: string | null;
 	period_start: string | null;
 	period_end: string | null;
+	thumbnail_path: string | null;
 	created_at: string;
 }
 
@@ -379,6 +380,11 @@ export interface HealthConfig {
 }
 
 export interface NotificationEventsConfig {
+	recording_started: boolean;
+	recording_stopped: boolean;
+	recording_failed: boolean;
+	clip_export_complete: boolean;
+	clip_export_failed: boolean;
 	capture_failure: boolean;
 	stream_unhealthy: boolean;
 	stream_recovered: boolean;
