@@ -631,6 +631,12 @@ class UserAdminRead(UserRead):
     accessible_profile_ids: list[int]
 
 
+class SelfUpdate(BaseModel):
+    display_name: str | None = None
+    email: str | None = None
+    password: str | None = None
+
+
 # --- TLS / ACME ---
 
 

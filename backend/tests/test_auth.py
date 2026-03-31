@@ -758,3 +758,48 @@ def test_profile_deletion_cascades_access(client: TestClient, db):
 
     rows_after = db.query(UserProfileAccess).filter(UserProfileAccess.profile_id == profiles[0].id).all()
     assert len(rows_after) == 0
+
+
+# ---------------------------------------------------------------------------
+# PUT /auth/me — self-update tests
+# ---------------------------------------------------------------------------
+
+PUT_ME_URL = "/api/auth/me"
+
+
+def test_update_me_display_name(client: TestClient):
+    """Authenticated user can update their own display_name."""
+    _setup_and_login(client)
+    resp = client.put(PUT_ME_URL, json={"display_name": "New Display Name"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["display_name"] == "New Display Name"
+
+
+def test_update_me_password_and_login(client: TestClient):
+    """Authenticated user can change their own password and then login with the new one."""
+    _setup_and_login(client)
+    resp = client.put(PUT_ME_URL, json={"password": "newpassword456"})
+    assert resp.status_code == 200
+
+    # Logout then try new password
+    client.post(LOGOUT_URL)
+    login_resp = client.post(LOGIN_URL, json={"username": "admin", "password": "newpassword456"})
+    assert login_resp.status_code == 200
+
+
+def test_update_me_unauthenticated(client: TestClient):
+    """Unauthenticated PUT /me -> 401."""
+    resp = client.put(PUT_ME_URL, json={"display_name": "Hacker"})
+    assert resp.status_code == 401
+
+
+def test_update_me_no_role_field(client: TestClient):
+    """SelfUpdate schema has no role field — sending role in payload has no effect."""
+    _setup_and_login(client)
+    # role is not in SelfUpdate schema; it should be ignored (FastAPI ignores extra fields)
+    resp = client.put(PUT_ME_URL, json={"display_name": "Safe", "role": "superadmin"})
+    assert resp.status_code == 200
+    # Role must remain unchanged
+    me_resp = client.get(ME_URL)
+    assert me_resp.json()["role"] == "admin"

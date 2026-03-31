@@ -41,6 +41,14 @@
 		toasts = toasts.filter((t) => t.id !== id);
 	}
 
+	async function handleLogout() {
+		try {
+			await api.logout();
+		} catch {}
+		authUser = null;
+		goto('/login');
+	}
+
 	// Load notifications, time format, and check setup status once on mount
 	$effect(() => {
 		const currentPath = $page.url.pathname;
@@ -137,7 +145,7 @@
 				<h1 class="text-lg font-bold tracking-tight text-white">Lapsora</h1>
 				<NotificationBell {notifications} onRefresh={loadNotifications} />
 			</div>
-			<nav class="flex-1 space-y-1 p-3">
+			<nav class="flex-1 space-y-1 overflow-y-auto p-3">
 				{#each navItems as item}
 					<a
 						href={item.href}
@@ -153,7 +161,36 @@
 						{item.label}
 					</a>
 				{/each}
+				{#if authUser?.role === 'admin'}
+					<a
+						href="/admin/users"
+						class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors {
+							$page.url.pathname.startsWith('/admin')
+								? 'bg-gray-800 text-white font-medium'
+								: 'text-gray-400 hover:bg-gray-800 hover:text-white'
+						}"
+					>
+						<svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+						</svg>
+						Admin
+					</a>
+				{/if}
 			</nav>
+			<div class="border-t border-gray-800 p-3">
+				<div class="mb-2 truncate px-3 py-1 text-sm font-medium text-gray-300">
+					{authUser?.display_name ?? authUser?.username ?? ''}
+				</div>
+				<button
+					onclick={handleLogout}
+					class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
+				>
+					<svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+					</svg>
+					Logout
+				</button>
+			</div>
 		</aside>
 
 		<main class="ml-56 flex-1 overflow-auto p-6">

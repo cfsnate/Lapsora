@@ -1,4 +1,4 @@
-import type { Stream, StreamCreate, StreamUpdate, Profile, ProfileCreate, ProfileUpdate, ProfileTemplate, ProfileTemplateCreate, Capture, Timelapse, TimelapseGenerate, TimelapseSchedule, TimelapseScheduleCreate, TimelapseScheduleUpdate, CleanupSchedule, CleanupScheduleCreate, CleanupScheduleUpdate, TestResult, StorageStats, Notification, NotificationURL, HealthConfig, NotificationEventsConfig, LocationConfig, CaptureGapConfig, TimeFormatConfig, StatsSummary, StorageTrendPoint, CaptureActivityPoint, ProfileStoragePoint, Go2rtcConfig, Go2rtcStreamInfo, TimelapseSummary, RecordingStatus, RecordingStorageStats, RecordingRetentionConfig, PlaybackAvailabilityRange, ClipExport, ClipExportCreate, SetupStatus, SetupCreate, AuthUser, LoginCredentials, OIDCConfig, OIDCConfigUpdate } from './types';
+import type { Stream, StreamCreate, StreamUpdate, Profile, ProfileCreate, ProfileUpdate, ProfileTemplate, ProfileTemplateCreate, Capture, Timelapse, TimelapseGenerate, TimelapseSchedule, TimelapseScheduleCreate, TimelapseScheduleUpdate, CleanupSchedule, CleanupScheduleCreate, CleanupScheduleUpdate, TestResult, StorageStats, Notification, NotificationURL, HealthConfig, NotificationEventsConfig, LocationConfig, CaptureGapConfig, TimeFormatConfig, StatsSummary, StorageTrendPoint, CaptureActivityPoint, ProfileStoragePoint, Go2rtcConfig, Go2rtcStreamInfo, TimelapseSummary, RecordingStatus, RecordingStorageStats, RecordingRetentionConfig, PlaybackAvailabilityRange, ClipExport, ClipExportCreate, SetupStatus, SetupCreate, AuthUser, LoginCredentials, OIDCConfig, OIDCConfigUpdate, UserAdminRead, UserCreate, UserUpdate, UserProfileAccessUpdate, SelfUpdate } from './types';
 
 const BASE = '/api';
 
@@ -202,4 +202,16 @@ export const api = {
 	getOIDCConfig: () => request<OIDCConfig>('/auth/oidc/config'),
 	saveOIDCConfig: (data: OIDCConfigUpdate) => request<OIDCConfig>('/auth/oidc/config', { method: 'PUT', body: JSON.stringify(data) }),
 	oidcLoginUrl: `${BASE}/auth/oidc/login`,
+
+	// User management (admin)
+	getUsers: () => request<UserAdminRead[]>('/auth/users'),
+	createUser: (data: UserCreate) => request<UserAdminRead>('/auth/users', { method: 'POST', body: JSON.stringify(data) }),
+	getUser: (id: number) => request<UserAdminRead>(`/auth/users/${id}`),
+	updateUser: (id: number, data: UserUpdate) => request<UserAdminRead>(`/auth/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+	disableUser: (id: number) => request<UserAdminRead>(`/auth/users/${id}`, { method: 'DELETE' }),
+	getUserProfiles: (id: number) => request<{ profile_ids: number[]; user_id: number }>(`/auth/users/${id}/profiles`),
+	setUserProfiles: (id: number, data: UserProfileAccessUpdate) => request<{ profile_ids: number[]; user_id: number }>(`/auth/users/${id}/profiles`, { method: 'PUT', body: JSON.stringify(data) }),
+
+	// Self-service account update
+	updateMe: (data: SelfUpdate) => request<AuthUser>('/auth/me', { method: 'PUT', body: JSON.stringify(data) }),
 };

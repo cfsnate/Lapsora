@@ -18,6 +18,7 @@ from app.schemas import (
     LoginRequest,
     OIDCConfigRead,
     OIDCConfigUpdate,
+    SelfUpdate,
     SetupCreate,
     SetupStatusResponse,
     UserAdminRead,
@@ -134,6 +135,26 @@ def logout(response: Response):
 @router.get("/me", response_model=UserRead)
 def me(current_user: User = Depends(get_current_user)):
     """Return the currently authenticated user."""
+    return current_user
+
+
+@router.put("/me", response_model=UserRead)
+def update_me(
+    payload: SelfUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Allow an authenticated user to update their own display_name, email, or password."""
+    if payload.display_name is not None:
+        current_user.display_name = payload.display_name
+    if payload.email is not None:
+        current_user.email = payload.email
+    if payload.password is not None:
+        current_user.password_hash = bcrypt.hashpw(
+            payload.password.encode("utf-8"), bcrypt.gensalt()
+        ).decode("utf-8")
+    db.commit()
+    db.refresh(current_user)
     return current_user
 
 

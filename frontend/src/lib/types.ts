@@ -523,3 +523,36 @@ export interface LoginCredentials {
 	username: string;
 	password: string;
 }
+
+// --- User management (admin + self-service) ---
+
+export interface UserAdminRead extends AuthUser {
+	accessible_profile_ids: number[];
+}
+
+export interface UserCreate {
+	username: string;
+	display_name: string;
+	password: string;
+	role?: string;
+	email?: string;
+	is_active?: boolean;
+}
+
+export interface UserUpdate {
+	display_name?: string;
+	email?: string;
+	role?: string;
+	is_active?: boolean;
+	password?: string;
+}
+
+export interface UserProfileAccessUpdate {
+	profile_ids: number[];
+}
+
+export interface SelfUpdate {
+	display_name?: string;
+	email?: string;
+	password?: string;
+}
