@@ -555,3 +555,30 @@ class TimelapseSummary(BaseModel):
     total_frames: int
     total_duration_seconds: float
     by_format: list[TimelapseFormatBreakdown]
+
+
+# --- Auth / Setup ---
+
+
+class SetupStatusResponse(BaseModel):
+    setup_required: bool
+
+
+class SetupCreate(BaseModel):
+    username: str
+    display_name: str
+    password: str
+    email: str | None = None
+
+
+class UserRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    username: str
+    display_name: str
+    email: str | None
+    role: str
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime

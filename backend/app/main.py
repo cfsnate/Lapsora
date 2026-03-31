@@ -112,6 +112,9 @@ app.include_router(playback_router.router)
 from app.routers import exports as exports_router
 app.include_router(exports_router.router)
 
+from app.routers import auth as auth_router
+app.include_router(auth_router.router)
+
 # Static file mounts
 data_dir = Path(app_settings.DATA_DIR)
 data_dir.mkdir(parents=True, exist_ok=True)
