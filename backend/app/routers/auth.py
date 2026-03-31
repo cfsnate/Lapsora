@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.config import decrypt, encrypt, settings
 from app.database import get_db
 from app.dependencies import get_current_user, require_admin
-from app.models import Group, GroupProfileAccess, OIDCGroupMapping, Profile, Setting, User, UserProfileAccess
+from app.models import Group, GroupProfileAccess, OIDCGroupMapping, Profile, Setting, User, UserGroupMembership, UserProfileAccess
 from app.schemas import (
     GroupCreate,
     GroupRead,
@@ -21,11 +21,13 @@ from app.schemas import (
     LoginRequest,
     OIDCConfigRead,
     OIDCConfigUpdate,
+    ProfilePermission,
     SelfUpdate,
     SetupCreate,
     SetupStatusResponse,
     UserAdminRead,
     UserCreate,
+    UserGroupMembershipUpdate,
     UserProfileAccessUpdate,
     UserRead,
     UserUpdate,
@@ -167,9 +169,20 @@ def update_me(
 
 
 def _build_admin_read(user: User, db: Session) -> UserAdminRead:
-    """Build a UserAdminRead by querying the junction table for profile IDs."""
+    """Build a UserAdminRead by querying the junction table for profile IDs and permissions."""
     rows = db.query(UserProfileAccess).filter(UserProfileAccess.user_id == user.id).all()
     profile_ids = [row.profile_id for row in rows]
+    profile_permissions = [
+        ProfilePermission(
+            profile_id=row.profile_id,
+            can_view=row.can_view,
+            can_export=row.can_export,
+            can_timelapse=row.can_timelapse,
+            can_manage=row.can_manage,
+        )
+        for row in rows
+    ]
+    group_rows = db.query(UserGroupMembership).filter(UserGroupMembership.user_id == user.id).all()
     return UserAdminRead(
         id=user.id,
         username=user.username,
@@ -181,6 +194,8 @@ def _build_admin_read(user: User, db: Session) -> UserAdminRead:
         created_at=user.created_at,
         updated_at=user.updated_at,
         accessible_profile_ids=profile_ids,
+        profile_permissions=profile_permissions,
+        group_ids=[row.group_id for row in group_rows],
     )
 
 
@@ -307,13 +322,25 @@ def get_user_profiles(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
-    """Get profile IDs the user can access (admin-only)."""
+    """Get profile access with permissions for a user (admin-only)."""
     user = db.query(User).filter(User.id == user_id).first()
     if user is None:
         raise HTTPException(status_code=404, detail="user_not_found")
 
     rows = db.query(UserProfileAccess).filter(UserProfileAccess.user_id == user_id).all()
-    return {"profile_ids": [row.profile_id for row in rows]}
+    return {
+        "profile_ids": [row.profile_id for row in rows],
+        "profile_permissions": [
+            ProfilePermission(
+                profile_id=row.profile_id,
+                can_view=row.can_view,
+                can_export=row.can_export,
+                can_timelapse=row.can_timelapse,
+                can_manage=row.can_manage,
+            ).model_dump()
+            for row in rows
+        ],
+    }
 
 
 @router.put("/users/{user_id}/profiles")
@@ -323,20 +350,35 @@ def set_user_profiles(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
-    """Set profile access for a user. Replaces all existing rows (admin-only)."""
+    """Set profile access for a user. Replaces all existing rows (admin-only).
+
+    Accepts either legacy profile_ids (all default permissions) or
+    profile_permissions (explicit per-profile flags). If both are provided,
+    profile_permissions takes precedence for any profile_id in both lists.
+    """
     user = db.query(User).filter(User.id == user_id).first()
     if user is None:
         raise HTTPException(status_code=404, detail="user_not_found")
 
+    # Build a permissions map: profile_id -> permission flags
+    perms_map: dict[int, ProfilePermission] = {}
+    for pp in payload.profile_permissions:
+        perms_map[pp.profile_id] = pp
+    for pid in payload.profile_ids:
+        if pid not in perms_map:
+            perms_map[pid] = ProfilePermission(profile_id=pid)
+
+    all_profile_ids = list(perms_map.keys())
+
     # Validate all profile IDs exist
-    if payload.profile_ids:
+    if all_profile_ids:
         existing_ids = {
             row.id
             for row in db.query(Profile.id)
-            .filter(Profile.id.in_(payload.profile_ids))
+            .filter(Profile.id.in_(all_profile_ids))
             .all()
         }
-        missing = set(payload.profile_ids) - existing_ids
+        missing = set(all_profile_ids) - existing_ids
         if missing:
             raise HTTPException(
                 status_code=400,
@@ -345,11 +387,21 @@ def set_user_profiles(
 
     # Replace access rows
     db.query(UserProfileAccess).filter(UserProfileAccess.user_id == user_id).delete()
-    for profile_id in payload.profile_ids:
-        db.add(UserProfileAccess(user_id=user_id, profile_id=profile_id))
+    for pid, pp in perms_map.items():
+        db.add(UserProfileAccess(
+            user_id=user_id,
+            profile_id=pid,
+            can_view=pp.can_view,
+            can_export=pp.can_export,
+            can_timelapse=pp.can_timelapse,
+            can_manage=pp.can_manage,
+        ))
     db.commit()
 
-    return {"profile_ids": payload.profile_ids}
+    return {
+        "profile_ids": all_profile_ids,
+        "profile_permissions": [pp.model_dump() for pp in perms_map.values()],
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -358,15 +410,27 @@ def set_user_profiles(
 
 
 def _build_group_read(group: Group, db: Session) -> GroupRead:
-    """Build a GroupRead by querying junction tables for profile IDs and OIDC mapping names."""
+    """Build a GroupRead by querying junction tables for profile IDs, permissions, OIDC mappings, and members."""
     profile_rows = db.query(GroupProfileAccess).filter(GroupProfileAccess.group_id == group.id).all()
     mapping_rows = db.query(OIDCGroupMapping).filter(OIDCGroupMapping.group_id == group.id).all()
+    member_rows = db.query(UserGroupMembership).filter(UserGroupMembership.group_id == group.id).all()
     return GroupRead(
         id=group.id,
         name=group.name,
         role=group.role,
         profile_ids=[row.profile_id for row in profile_rows],
+        profile_permissions=[
+            ProfilePermission(
+                profile_id=row.profile_id,
+                can_view=row.can_view,
+                can_export=row.can_export,
+                can_timelapse=row.can_timelapse,
+                can_manage=row.can_manage,
+            )
+            for row in profile_rows
+        ],
         oidc_group_names=[row.oidc_group_name for row in mapping_rows],
+        member_user_ids=[row.user_id for row in member_rows],
         created_at=group.created_at,
         updated_at=group.updated_at,
     )
@@ -400,10 +464,11 @@ def create_group(
     if payload.role not in ("admin", "user"):
         raise HTTPException(status_code=400, detail="invalid_role")
 
-    # Validate profile IDs exist
-    if payload.profile_ids:
-        existing = {r.id for r in db.query(Profile.id).filter(Profile.id.in_(payload.profile_ids)).all()}
-        missing = set(payload.profile_ids) - existing
+    # Validate profile IDs exist (from both profile_ids and profile_permissions)
+    all_pids = set(payload.profile_ids) | {pp.profile_id for pp in payload.profile_permissions}
+    if all_pids:
+        existing = {r.id for r in db.query(Profile.id).filter(Profile.id.in_(all_pids)).all()}
+        missing = all_pids - existing
         if missing:
             raise HTTPException(status_code=400, detail=f"profile_ids_not_found: {sorted(missing)}")
 
@@ -422,8 +487,23 @@ def create_group(
     db.add(group)
     db.flush()  # get group.id
 
+    # Build permissions map: profile_permissions takes precedence over bare profile_ids
+    perms_map: dict[int, ProfilePermission] = {}
+    for pp in payload.profile_permissions:
+        perms_map[pp.profile_id] = pp
     for pid in payload.profile_ids:
-        db.add(GroupProfileAccess(group_id=group.id, profile_id=pid))
+        if pid not in perms_map:
+            perms_map[pid] = ProfilePermission(profile_id=pid)
+
+    for pid, pp in perms_map.items():
+        db.add(GroupProfileAccess(
+            group_id=group.id,
+            profile_id=pid,
+            can_view=pp.can_view,
+            can_export=pp.can_export,
+            can_timelapse=pp.can_timelapse,
+            can_manage=pp.can_manage,
+        ))
     for name in payload.oidc_group_names:
         db.add(OIDCGroupMapping(group_id=group.id, oidc_group_name=name))
 
@@ -455,16 +535,34 @@ def update_group(
             raise HTTPException(status_code=400, detail="invalid_role")
         group.role = payload.role
 
-    if payload.profile_ids is not None:
-        if payload.profile_ids:
-            existing = {r.id for r in db.query(Profile.id).filter(Profile.id.in_(payload.profile_ids)).all()}
-            missing = set(payload.profile_ids) - existing
+    if payload.profile_ids is not None or payload.profile_permissions is not None:
+        # Build permissions map from both fields
+        perms_map: dict[int, ProfilePermission] = {}
+        if payload.profile_permissions:
+            for pp in payload.profile_permissions:
+                perms_map[pp.profile_id] = pp
+        if payload.profile_ids is not None:
+            for pid in payload.profile_ids:
+                if pid not in perms_map:
+                    perms_map[pid] = ProfilePermission(profile_id=pid)
+
+        all_pids = list(perms_map.keys())
+        if all_pids:
+            existing = {r.id for r in db.query(Profile.id).filter(Profile.id.in_(all_pids)).all()}
+            missing = set(all_pids) - existing
             if missing:
                 raise HTTPException(status_code=400, detail=f"profile_ids_not_found: {sorted(missing)}")
 
         db.query(GroupProfileAccess).filter(GroupProfileAccess.group_id == group_id).delete()
-        for pid in payload.profile_ids:
-            db.add(GroupProfileAccess(group_id=group_id, profile_id=pid))
+        for pid, pp in perms_map.items():
+            db.add(GroupProfileAccess(
+                group_id=group_id,
+                profile_id=pid,
+                can_view=pp.can_view,
+                can_export=pp.can_export,
+                can_timelapse=pp.can_timelapse,
+                can_manage=pp.can_manage,
+            ))
 
     if payload.oidc_group_names is not None:
         # Check conflicts with OTHER groups
@@ -504,6 +602,52 @@ def delete_group(
     db.delete(group)
     db.commit()
     return None
+
+
+# ---------------------------------------------------------------------------
+# User group membership (admin-only)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/users/{user_id}/groups")
+def get_user_groups(
+    user_id: int,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Get groups the user belongs to (admin-only)."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="user_not_found")
+
+    rows = db.query(UserGroupMembership).filter(UserGroupMembership.user_id == user_id).all()
+    return {"group_ids": [row.group_id for row in rows]}
+
+
+@router.put("/users/{user_id}/groups")
+def set_user_groups(
+    user_id: int,
+    payload: UserGroupMembershipUpdate,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Set group membership for a user. Replaces all existing rows (admin-only)."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="user_not_found")
+
+    # Validate group IDs exist
+    if payload.group_ids:
+        existing_ids = {r.id for r in db.query(Group.id).filter(Group.id.in_(payload.group_ids)).all()}
+        missing = set(payload.group_ids) - existing_ids
+        if missing:
+            raise HTTPException(status_code=400, detail=f"group_ids_not_found: {sorted(missing)}")
+
+    db.query(UserGroupMembership).filter(UserGroupMembership.user_id == user_id).delete()
+    for gid in payload.group_ids:
+        db.add(UserGroupMembership(user_id=user_id, group_id=gid))
+    db.commit()
+    return {"group_ids": payload.group_ids}
 
 
 # ---------------------------------------------------------------------------

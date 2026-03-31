@@ -608,10 +608,23 @@ class OIDCConfigUpdate(BaseModel):
 # --- Groups (OIDC group mapping) ---
 
 
+# --- Per-profile permission entry ---
+
+
+class ProfilePermission(BaseModel):
+    """Per-profile permission flags for a user or group access entry."""
+    profile_id: int
+    can_view: bool = True
+    can_export: bool = False
+    can_timelapse: bool = False
+    can_manage: bool = False
+
+
 class GroupCreate(BaseModel):
     name: str
     role: str = "user"
     profile_ids: list[int] = []
+    profile_permissions: list[ProfilePermission] = []
     oidc_group_names: list[str] = []
 
 
@@ -619,6 +632,7 @@ class GroupUpdate(BaseModel):
     name: str | None = None
     role: str | None = None
     profile_ids: list[int] | None = None
+    profile_permissions: list[ProfilePermission] | None = None
     oidc_group_names: list[str] | None = None
 
 
@@ -629,7 +643,9 @@ class GroupRead(BaseModel):
     name: str
     role: str
     profile_ids: list[int]
+    profile_permissions: list[ProfilePermission]
     oidc_group_names: list[str]
+    member_user_ids: list[int]
     created_at: datetime
     updated_at: datetime
 
@@ -655,11 +671,18 @@ class UserUpdate(BaseModel):
 
 
 class UserProfileAccessUpdate(BaseModel):
-    profile_ids: list[int]
+    profile_ids: list[int] = []
+    profile_permissions: list[ProfilePermission] = []
 
 
 class UserAdminRead(UserRead):
     accessible_profile_ids: list[int]
+    profile_permissions: list[ProfilePermission] = []
+    group_ids: list[int] = []
+
+
+class UserGroupMembershipUpdate(BaseModel):
+    group_ids: list[int]
 
 
 class SelfUpdate(BaseModel):
