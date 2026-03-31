@@ -191,8 +191,13 @@ class RecordingProcess:
             "-hide_banner",
             "-loglevel", "warning",
             "-rtsp_transport", "tcp",
+            "-rtsp_flags", "prefer_tcp",
             "-use_wallclock_as_timestamps", "1",
             "-stimeout", "5000000",
+            "-timeout", "5000000",       # TCP-level I/O timeout (microseconds)
+            "-reconnect", "1",           # auto-reconnect on disconnect
+            "-reconnect_streamed", "1",  # reconnect even for streamed protocols
+            "-reconnect_delay_max", "5", # max 5s between reconnect attempts
             "-i", self.rtsp_url,
             "-c", "copy",
             "-f", "segment",
