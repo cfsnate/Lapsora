@@ -43,6 +43,9 @@
 
 	let recordingRetentionDays = $state(14);
 	let savingRecordingRetention = $state(false);
+	let showDeleteAllRecordings = $state(false);
+	let deletingAllRecordings = $state(false);
+	let deleteRecordingsResult = $state<string | null>(null);
 
 	let loading = $state(true);
 	let newLabel = $state('');
@@ -186,6 +189,20 @@
 			alert(err instanceof Error ? err.message : 'Failed to save recording retention');
 		} finally {
 			savingRecordingRetention = false;
+		}
+	}
+
+	async function confirmDeleteAllRecordings() {
+		deletingAllRecordings = true;
+		deleteRecordingsResult = null;
+		try {
+			const result = await api.deleteAllRecordings();
+			deleteRecordingsResult = `Deleted ${result.segments_deleted} segments, freed ${(result.bytes_freed / 1024 / 1024).toFixed(1)} MB`;
+			showDeleteAllRecordings = false;
+		} catch (err) {
+			deleteRecordingsResult = `Error: ${err instanceof Error ? err.message : 'Failed to delete recordings'}`;
+		} finally {
+			deletingAllRecordings = false;
 		}
 	}
 
@@ -508,6 +525,21 @@
 						{savingRecordingRetention ? 'Saving...' : 'Save'}
 					</button>
 				</div>
+
+				<!-- Delete All Recordings -->
+				<div class="mt-6 border-t border-gray-700 pt-4">
+					<h4 class="mb-1 text-sm font-medium text-red-400">Danger Zone</h4>
+					<p class="mb-3 text-xs text-gray-500">Permanently delete all recording segments from disk and database. Active recordings will be stopped and restarted.</p>
+					<button
+						onclick={() => { showDeleteAllRecordings = true; }}
+						class="rounded-lg border border-red-800 bg-red-950/50 px-4 py-2 text-sm font-medium text-red-400 transition-colors hover:bg-red-900/50 hover:text-red-300"
+					>
+						Delete All Recordings
+					</button>
+					{#if deleteRecordingsResult}
+						<p class="mt-2 text-xs {deleteRecordingsResult.startsWith('Error') ? 'text-red-400' : 'text-green-400'}">{deleteRecordingsResult}</p>
+					{/if}
+				</div>
 			</div>
 
 			<!-- Data Cleanup -->
@@ -521,3 +553,36 @@
 		</section>
 	{/if}
 </div>
+
+<!-- Delete All Recordings Confirmation Modal -->
+{#if showDeleteAllRecordings}
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onclick={() => { if (!deletingAllRecordings) showDeleteAllRecordings = false; }}>
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="mx-4 w-full max-w-sm rounded-xl bg-gray-900 p-6 shadow-xl" onclick={(e) => e.stopPropagation()}>
+			<h3 class="mb-2 text-lg font-semibold text-red-400">Delete All Recordings</h3>
+			<p class="mb-2 text-sm text-gray-300">
+				This will <strong class="text-white">permanently delete</strong> all recording segment files from disk and remove all segment records from the database.
+			</p>
+			<p class="mb-4 text-sm text-gray-400">
+				Active recordings will be stopped and automatically restarted afterward. This action <strong class="text-red-400">cannot be undone</strong>.
+			</p>
+			<div class="flex justify-end gap-3">
+				<button
+					onclick={() => { showDeleteAllRecordings = false; }}
+					disabled={deletingAllRecordings}
+					class="rounded-lg border border-gray-700 px-4 py-2 text-sm text-gray-300 hover:bg-gray-800 disabled:opacity-50"
+				>
+					Cancel
+				</button>
+				<button
+					onclick={confirmDeleteAllRecordings}
+					disabled={deletingAllRecordings}
+					class="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-50"
+				>
+					{deletingAllRecordings ? 'Deleting...' : 'Delete Everything'}
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}

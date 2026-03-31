@@ -165,6 +165,7 @@ export const api = {
 	getRecordingStatuses: () => request<Record<string, RecordingStatus>>('/recording/status'),
 	getRecordingStatus: (profileId: number) => request<RecordingStatus>(`/recording/status/${profileId}`),
 	getRecordingSegmentsSummary: (profileId: number) => request<{ profile_id: number; segment_count: number; total_bytes: number; total_duration_seconds: number; earliest: string | null; latest: string | null }>(`/recording/${profileId}/segments/summary`),
+	deleteAllRecordings: () => request<{ status: string; segments_deleted: number; bytes_freed: number }>('/recording/all', { method: 'DELETE' }),
 
 	// Playback
 	getPlaylistUrl: (profileId: number, start: string, end: string) =>
