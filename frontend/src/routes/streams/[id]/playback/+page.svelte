@@ -21,6 +21,7 @@
 	let playing = $state(false);
 	let hlsSrc = $state('');
 	let seekTarget = $state<Date | null>(null);
+	let noRecordingMsg = $state(false);
 	let liveWsUrl = $state<string | null>(null);
 	let liveHlsSrc = $state<string | null>(null);
 	// Separate tracking for the playback window so hlsSrc mutations don't re-trigger effects
@@ -85,6 +86,22 @@
 
 	function handleSeek(time: Date) {
 		if (!selectedProfileId) return;
+
+		// Check if the clicked time falls within a recorded range
+		const clickMs = time.getTime();
+		const inRange = availabilityRanges.some(r => {
+			const s = new Date(r.start).getTime();
+			const e = new Date(r.end).getTime();
+			return clickMs >= s && clickMs <= e;
+		});
+
+		if (!inRange) {
+			// Brief toast-style message — no seek
+			noRecordingMsg = true;
+			setTimeout(() => { noRecordingMsg = false; }, 2000);
+			return;
+		}
+
 		mode = 'recording';
 		seekTarget = time;
 		const start = new Date(time.getTime() - 30 * 60 * 1000);
@@ -276,6 +293,11 @@
 				{clipMode}
 				onSelectionChange={handleSelectionChange}
 			/>
+			{#if noRecordingMsg}
+				<div class="text-center text-sm text-yellow-400/80 -mt-2">
+					No recording at this time
+				</div>
+			{/if}
 		{/if}
 
 		{#if selectedProfileId && selectionStart && selectionEnd}
