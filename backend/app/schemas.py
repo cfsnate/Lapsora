@@ -263,6 +263,8 @@ class ClipExportRead(BaseModel):
 
     id: int
     profile_id: int
+    profile_name: str | None = None
+    stream_name: str | None = None
     file_path: str | None
     file_size: int | None
     format: str

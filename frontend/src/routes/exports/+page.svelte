@@ -9,6 +9,7 @@
 	let filterStatus = $state('');
 	let deleteTarget = $state<ClipExport | null>(null);
 	let cancelTarget = $state<ClipExport | null>(null);
+	let playingExport = $state<ClipExport | null>(null);
 	let deleting = $state(false);
 	let cancelling = $state(false);
 
@@ -144,7 +145,7 @@
 							</svg>
 							<span class="text-xs font-bold text-red-500">Failed</span>
 						{/if}
-						<span class="text-sm text-gray-200">Profile {exp.profile_id}</span>
+						<span class="text-sm text-gray-200">{exp.stream_name ?? 'Unknown'}{exp.profile_name ? ` · ${exp.profile_name}` : ''}</span>
 					</div>
 
 					<!-- Line 2: metadata -->
@@ -170,6 +171,15 @@
 					<div class="mt-2 flex items-center gap-1">
 						<div class="flex-1"></div>
 						{#if exp.status === 'completed'}
+							<button
+								onclick={() => { playingExport = exp; }}
+								class="inline-flex items-center rounded px-3 py-2 text-xs font-bold text-green-400 hover:bg-gray-800"
+							>
+								<svg class="mr-1 h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
+									<path d="M8 5v14l11-7z" />
+								</svg>
+								Play
+							</button>
 							<a
 								href={api.getExportDownloadUrl(exp.id)}
 								download
@@ -178,7 +188,7 @@
 								<svg class="mr-1 h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
 									<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
 								</svg>
-								Download Clip
+								Download
 							</a>
 						{/if}
 						{#if exp.status === 'pending' || exp.status === 'processing'}
@@ -259,6 +269,36 @@
 				>
 					{cancelling ? 'Cancelling...' : 'Cancel Export'}
 				</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Clip Player Modal -->
+{#if playingExport}
+	<!-- svelte-ignore a11y_no_static_element_interactions -->
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onclick={() => { playingExport = null; }}>
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<div class="mx-4 w-full max-w-3xl rounded-xl bg-gray-900 shadow-xl" onclick={(e) => e.stopPropagation()}>
+			<div class="flex items-center justify-between border-b border-gray-800 p-4">
+				<div>
+					<h2 class="text-lg font-semibold text-gray-100">Clip Export</h2>
+					<p class="text-xs text-gray-400">{playingExport.stream_name ?? ''}{playingExport.profile_name ? ` · ${playingExport.profile_name}` : ''}</p>
+				</div>
+				<button onclick={() => { playingExport = null; }} class="text-gray-400 hover:text-gray-200" aria-label="Close">
+					<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+					</svg>
+				</button>
+			</div>
+			<div class="p-4">
+				<!-- svelte-ignore a11y_media_has_caption -->
+				<video
+					src={api.getExportDownloadUrl(playingExport.id)}
+					controls
+					autoplay
+					class="w-full rounded-lg bg-black"
+				></video>
 			</div>
 		</div>
 	</div>

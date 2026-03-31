@@ -453,6 +453,8 @@ export interface PlaybackAvailabilityRange {
 export interface ClipExport {
 	id: number;
 	profile_id: number;
+	profile_name: string | null;
+	stream_name: string | null;
 	file_path: string | null;
 	file_size: number | null;
 	format: string;
