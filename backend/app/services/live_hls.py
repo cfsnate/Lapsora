@@ -13,8 +13,6 @@ logger = logging.getLogger(__name__)
 
 # How long (seconds) an idle HLS session lives before being reaped
 SESSION_TTL = 60
-# How long (seconds) to wait before considering FFmpeg startup failed
-STARTUP_TIMEOUT = 15
 # HLS segment duration in seconds
 SEGMENT_DURATION = 2
 # Number of segments to keep in the playlist
@@ -29,7 +27,6 @@ class LiveSession:
     process: asyncio.subprocess.Process | None = None
     last_accessed: float = field(default_factory=time.monotonic)
     ready: bool = False
-    _ready_event: asyncio.Event = field(default_factory=asyncio.Event)
 
 
 class LiveHLSManager:
@@ -44,7 +41,11 @@ class LiveHLSManager:
         return self._locks[stream_id]
 
     async def get_playlist_url(self, stream_id: int, rtsp_url: str) -> str:
-        """Ensure a live HLS session is running and return the playlist path."""
+        """Ensure a live HLS session is running and return the playlist path.
+
+        Returns immediately — does not wait for FFmpeg to produce segments.
+        HLS.js on the client handles polling until the stream is ready.
+        """
         async with self._lock_for(stream_id):
             session = self._sessions.get(stream_id)
             if session is None or (session.process and session.process.returncode is not None):
@@ -52,12 +53,6 @@ class LiveHLSManager:
                 self._sessions[stream_id] = session
             else:
                 session.last_accessed = time.monotonic()
-
-        # Wait for the first segment to appear (up to STARTUP_TIMEOUT)
-        try:
-            await asyncio.wait_for(session._ready_event.wait(), timeout=STARTUP_TIMEOUT)
-        except asyncio.TimeoutError:
-            logger.warning("Live HLS session for stream %d did not become ready in time", stream_id)
 
         return f"/api/streams/{stream_id}/live-hls/playlist.m3u8"
 
@@ -112,11 +107,11 @@ class LiveHLSManager:
         return session
 
     async def _watch_session(self, session: LiveSession) -> None:
-        """Poll for the first usable segment then signal ready."""
+        """Log when the stream becomes ready and capture FFmpeg stderr on exit."""
         process = session.process
         assert process is not None
 
-        # Poll until we have a playlist with at least one segment file that exists on disk
+        # Poll until first segment exists — just for logging, not blocking the API
         while not session.ready:
             playlist_path = os.path.join(session.output_dir, "playlist.m3u8")
             if os.path.exists(playlist_path):
@@ -125,23 +120,28 @@ class LiveHLSManager:
                         lines = f.readlines()
                     ts_files = [l.strip() for l in lines if l.strip().endswith(".ts")]
                     if ts_files:
-                        # Verify at least one segment file actually exists and has content
                         seg_path = os.path.join(session.output_dir, ts_files[-1])
                         if os.path.exists(seg_path) and os.path.getsize(seg_path) > 0:
                             session.ready = True
-                            session._ready_event.set()
                             logger.info("Live HLS stream %d is ready (%d segments visible)",
                                         session.stream_id, len(ts_files))
                             break
                 except OSError:
                     pass
             if process.returncode is not None:
-                logger.error("Live HLS FFmpeg exited before stream became ready (stream %d)",
-                             session.stream_id)
                 break
             await asyncio.sleep(0.25)
 
-        # Drain stderr for diagnostics without blocking indefinitely
+        if not session.ready:
+            logger.error("Live HLS FFmpeg exited before stream became ready (stream %d)",
+                         session.stream_id)
+
+        # Wait for process to exit, then capture stderr for diagnostics
+        try:
+            await asyncio.wait_for(process.wait(), timeout=30)
+        except asyncio.TimeoutError:
+            pass
+
         if process.stderr:
             try:
                 stderr = await asyncio.wait_for(process.stderr.read(), timeout=2.0)

@@ -131,11 +131,13 @@
 
 			if (Hls.isSupported()) {
 				const instance = new Hls({
-					// For live HLS, be patient: the stream may take a few seconds to start
-					manifestLoadingMaxRetry: isLiveHls ? 10 : 2,
+					// Live HLS: FFmpeg takes a few seconds to produce the first segment.
+					// Retry patiently — the backend starts FFmpeg immediately but doesn't
+					// wait for it before returning the URL.
+					manifestLoadingMaxRetry: isLiveHls ? 20 : 2,
 					manifestLoadingRetryDelay: isLiveHls ? 500 : 500,
 					manifestLoadingMaxRetryTimeout: isLiveHls ? 2000 : 2000,
-					levelLoadingMaxRetry: isLiveHls ? 6 : 2,
+					levelLoadingMaxRetry: isLiveHls ? 10 : 2,
 					levelLoadingRetryDelay: isLiveHls ? 500 : 500,
 					// Keep a modest buffer — live view doesn't need 30s
 					maxBufferLength: isLiveHls ? 8 : 30,
@@ -213,10 +215,15 @@
 		</div>
 	{:else if status === 'loading'}
 		<div class="absolute inset-0 flex items-center justify-center bg-black/50">
-			<svg class="h-8 w-8 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
-				<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" class="opacity-25"></circle>
-				<path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" class="opacity-75"></path>
-			</svg>
+			<div class="flex flex-col items-center gap-3">
+				<svg class="h-8 w-8 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none">
+					<circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" class="opacity-25"></circle>
+					<path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" class="opacity-75"></path>
+				</svg>
+				{#if mode === 'live'}
+					<p class="text-xs text-gray-500">Starting live stream…</p>
+				{/if}
+			</div>
 		</div>
 	{:else if status === 'error'}
 		<div class="absolute inset-0 flex items-center justify-center">
