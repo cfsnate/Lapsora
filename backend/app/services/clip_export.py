@@ -77,7 +77,7 @@ async def process_clip_export(
         fd, concat_path = tempfile.mkstemp(suffix=".txt", prefix="concat_")
         with os.fdopen(fd, "w") as f:
             for seg in segments:
-                abs_path = os.path.join(settings.DATA_DIR, seg.file_path)
+                abs_path = os.path.abspath(os.path.join(settings.DATA_DIR, seg.file_path))
                 f.write(f"file '{abs_path}'\n")
 
         offset = max(
