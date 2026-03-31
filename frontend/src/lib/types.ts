@@ -510,6 +510,7 @@ export interface OIDCConfig {
 	enabled: boolean;
 	provider_name: string | null;
 	issuer_url: string | null;
+	groups_claim: string | null;
 }
 
 export interface OIDCConfigUpdate {
@@ -517,6 +518,7 @@ export interface OIDCConfigUpdate {
 	client_id: string;
 	client_secret: string;
 	provider_name?: string;
+	groups_claim?: string;
 }
 
 export interface LoginCredentials {
@@ -555,4 +557,30 @@ export interface SelfUpdate {
 	display_name?: string;
 	email?: string;
 	password?: string;
+}
+
+// --- Groups (OIDC group mapping) ---
+
+export interface GroupRead {
+	id: number;
+	name: string;
+	role: string;
+	profile_ids: number[];
+	oidc_group_names: string[];
+	created_at: string;
+	updated_at: string;
+}
+
+export interface GroupCreate {
+	name: string;
+	role?: string;
+	profile_ids?: number[];
+	oidc_group_names?: string[];
+}
+
+export interface GroupUpdate {
+	name?: string;
+	role?: string;
+	profile_ids?: number[];
+	oidc_group_names?: string[];
 }

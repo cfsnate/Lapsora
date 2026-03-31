@@ -49,7 +49,7 @@
 
 	// OIDC config state
 	let oidcConfig = $state<OIDCConfig | null>(null);
-	let oidcForm = $state<OIDCConfigUpdate>({ issuer_url: '', client_id: '', client_secret: '', provider_name: '' });
+	let oidcForm = $state<OIDCConfigUpdate>({ issuer_url: '', client_id: '', client_secret: '', provider_name: '', groups_claim: 'groups' });
 	let savingOIDC = $state(false);
 	let oidcSaveResult = $state<{ ok: boolean; message: string } | null>(null);
 
@@ -82,7 +82,8 @@
 				issuer_url: cfg.issuer_url ?? '',
 				client_id: '',
 				client_secret: '',
-				provider_name: cfg.provider_name ?? ''
+				provider_name: cfg.provider_name ?? '',
+				groups_claim: cfg.groups_claim ?? 'groups'
 			};
 		}).catch(() => {
 			// OIDC not yet configured
@@ -633,6 +634,17 @@
 							placeholder="Google, Okta, Keycloak…"
 							class="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
 						/>
+					</div>
+					<div>
+						<label for="oidc-groups-claim" class="mb-1 block text-sm font-medium text-gray-300">Groups Claim <span class="text-gray-500">(default: groups)</span></label>
+						<input
+							id="oidc-groups-claim"
+							type="text"
+							bind:value={oidcForm.groups_claim}
+							placeholder="groups"
+							class="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+						/>
+						<p class="mt-1 text-xs text-gray-500">The OIDC token claim that contains the user's group list. Common values: groups, roles, realm_access.roles</p>
 					</div>
 					{#if oidcSaveResult}
 						<p class="text-sm {oidcSaveResult.ok ? 'text-green-400' : 'text-red-400'}">{oidcSaveResult.message}</p>

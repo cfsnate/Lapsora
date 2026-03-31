@@ -1,4 +1,4 @@
-import type { Stream, StreamCreate, StreamUpdate, Profile, ProfileCreate, ProfileUpdate, ProfileTemplate, ProfileTemplateCreate, Capture, Timelapse, TimelapseGenerate, TimelapseSchedule, TimelapseScheduleCreate, TimelapseScheduleUpdate, CleanupSchedule, CleanupScheduleCreate, CleanupScheduleUpdate, TestResult, StorageStats, Notification, NotificationURL, HealthConfig, NotificationEventsConfig, LocationConfig, CaptureGapConfig, TimeFormatConfig, StatsSummary, StorageTrendPoint, CaptureActivityPoint, ProfileStoragePoint, Go2rtcConfig, Go2rtcStreamInfo, TimelapseSummary, RecordingStatus, RecordingStorageStats, RecordingRetentionConfig, PlaybackAvailabilityRange, ClipExport, ClipExportCreate, SetupStatus, SetupCreate, AuthUser, LoginCredentials, OIDCConfig, OIDCConfigUpdate, UserAdminRead, UserCreate, UserUpdate, UserProfileAccessUpdate, SelfUpdate } from './types';
+import type { Stream, StreamCreate, StreamUpdate, Profile, ProfileCreate, ProfileUpdate, ProfileTemplate, ProfileTemplateCreate, Capture, Timelapse, TimelapseGenerate, TimelapseSchedule, TimelapseScheduleCreate, TimelapseScheduleUpdate, CleanupSchedule, CleanupScheduleCreate, CleanupScheduleUpdate, TestResult, StorageStats, Notification, NotificationURL, HealthConfig, NotificationEventsConfig, LocationConfig, CaptureGapConfig, TimeFormatConfig, StatsSummary, StorageTrendPoint, CaptureActivityPoint, ProfileStoragePoint, Go2rtcConfig, Go2rtcStreamInfo, TimelapseSummary, RecordingStatus, RecordingStorageStats, RecordingRetentionConfig, PlaybackAvailabilityRange, ClipExport, ClipExportCreate, SetupStatus, SetupCreate, AuthUser, LoginCredentials, OIDCConfig, OIDCConfigUpdate, UserAdminRead, UserCreate, UserUpdate, UserProfileAccessUpdate, SelfUpdate, GroupRead, GroupCreate, GroupUpdate } from './types';
 
 const BASE = '/api';
 
@@ -214,4 +214,10 @@ export const api = {
 
 	// Self-service account update
 	updateMe: (data: SelfUpdate) => request<AuthUser>('/auth/me', { method: 'PUT', body: JSON.stringify(data) }),
+
+	// Group management (admin)
+	getGroups: () => request<GroupRead[]>('/auth/groups'),
+	createGroup: (data: GroupCreate) => request<GroupRead>('/auth/groups', { method: 'POST', body: JSON.stringify(data) }),
+	updateGroup: (id: number, data: GroupUpdate) => request<GroupRead>(`/auth/groups/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+	deleteGroup: (id: number) => request<void>(`/auth/groups/${id}`, { method: 'DELETE' }),
 };
