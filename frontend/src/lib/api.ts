@@ -171,7 +171,7 @@ export const api = {
 	// Exports
 	getExports: (status?: string) => {
 		const qs = status ? `?status=${encodeURIComponent(status)}` : '';
-		return request<ClipExport[]>(`/exports${qs}`);
+		return request<ClipExport[]>(`/exports/${qs}`);
 	},
 	getExport: (id: number) => request<ClipExport>(`/exports/${id}`),
 	createExport: (data: ClipExportCreate) =>

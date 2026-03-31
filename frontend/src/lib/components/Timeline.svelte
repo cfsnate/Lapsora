@@ -5,10 +5,11 @@
 		onSeek: (time: Date) => void;
 		selectionStart?: Date | null;
 		selectionEnd?: Date | null;
+		clipMode?: boolean;
 		onSelectionChange?: (start: Date | null, end: Date | null) => void;
 	}
 
-	let { availabilityRanges, currentTime, onSeek, selectionStart = null, selectionEnd = null, onSelectionChange }: Props = $props();
+	let { availabilityRanges, currentTime, onSeek, selectionStart = null, selectionEnd = null, clipMode = false, onSelectionChange }: Props = $props();
 
 	let containerEl = $state<HTMLDivElement | null>(null);
 	let containerWidth = $state(800);
@@ -150,7 +151,8 @@
 				const localX = e.clientX - rect.left;
 				const clickedTime = xToTime(localX);
 
-				if (e.shiftKey) {
+				// In clip mode (or with Shift held), clicks set selection points
+				if (clipMode || e.shiftKey) {
 					if (!selectionStart) {
 						onSelectionChange?.(clickedTime, null);
 					} else if (!selectionEnd) {
@@ -159,7 +161,8 @@
 						if (end < s) [s, end] = [end, s];
 						onSelectionChange?.(s, end);
 					} else {
-						onSelectionChange?.(null, null);
+						// Reset and start new selection
+						onSelectionChange?.(clickedTime, null);
 					}
 					return;
 				}
@@ -198,7 +201,7 @@
 	<!-- Timeline track -->
 	<div
 		bind:this={containerEl}
-		class="relative h-12 w-full cursor-pointer rounded bg-gray-800 touch-none"
+		class="relative h-12 w-full rounded bg-gray-800 touch-none {clipMode ? 'cursor-crosshair' : 'cursor-pointer'}"
 		onwheel={handleWheel}
 		onpointerdown={handlePointerDown}
 		onpointermove={handlePointerMove}

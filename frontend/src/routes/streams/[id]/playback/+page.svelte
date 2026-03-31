@@ -31,6 +31,7 @@
 	let selectionStart = $state<Date | null>(null);
 	let selectionEnd = $state<Date | null>(null);
 	let showExportDialog = $state(false);
+	let clipMode = $state(false);
 	let hasSelection = $derived(selectionStart !== null && selectionEnd !== null);
 
 	let recordingProfiles = $derived(profiles.filter(p => p.recording_enabled));
@@ -133,6 +134,14 @@
 		selectionEnd = end;
 	}
 
+	function handleClipModeToggle() {
+		clipMode = !clipMode;
+		if (!clipMode) {
+			selectionStart = null;
+			selectionEnd = null;
+		}
+	}
+
 	function handleExportClick() {
 		showExportDialog = true;
 	}
@@ -145,6 +154,7 @@
 		showExportDialog = false;
 		selectionStart = null;
 		selectionEnd = null;
+		clipMode = false;
 	}
 
 	function handleProfileChange(profileId: number) {
@@ -244,10 +254,12 @@
 			{playbackRate}
 			isLive={mode === 'live'}
 			{hasSelection}
+			{clipMode}
 			onPlayPause={handlePlayPause}
 			onSpeedChange={handleSpeedChange}
 			onGoLive={handleGoLive}
 			onExportClick={handleExportClick}
+			onClipModeToggle={handleClipModeToggle}
 		/>
 
 		<!-- Timeline -->
@@ -258,6 +270,7 @@
 				onSeek={handleSeek}
 				{selectionStart}
 				{selectionEnd}
+				{clipMode}
 				onSelectionChange={handleSelectionChange}
 			/>
 		{/if}

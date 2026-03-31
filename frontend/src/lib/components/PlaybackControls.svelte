@@ -5,13 +5,15 @@
 		playbackRate: number;
 		isLive: boolean;
 		hasSelection?: boolean;
+		clipMode?: boolean;
 		onPlayPause: () => void;
 		onSpeedChange: (rate: number) => void;
 		onGoLive: () => void;
 		onExportClick?: () => void;
+		onClipModeToggle?: () => void;
 	}
 
-	let { currentTime, playing, playbackRate, isLive, hasSelection = false, onPlayPause, onSpeedChange, onGoLive, onExportClick }: Props = $props();
+	let { currentTime, playing, playbackRate, isLive, hasSelection = false, clipMode = false, onPlayPause, onSpeedChange, onGoLive, onExportClick, onClipModeToggle }: Props = $props();
 
 	let timeDisplay = $derived(
 		currentTime
@@ -47,11 +49,25 @@
 		{/each}
 	</div>
 
+	<!-- Clip export mode toggle -->
+	{#if onClipModeToggle}
+		<button
+			onclick={onClipModeToggle}
+			class="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors {clipMode ? 'bg-orange-600 text-white hover:bg-orange-500' : 'bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700'}"
+			aria-label={clipMode ? 'Cancel clip selection' : 'Select clip to export'}
+		>
+			<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 002.828 2.828L18 9.828V15h2V5h-10v2h5.172z" />
+			</svg>
+			{clipMode ? 'Cancel' : 'Clip'}
+		</button>
+	{/if}
+
 	{#if hasSelection && onExportClick}
 		<button onclick={onExportClick}
 			class="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-500 transition-colors">
 			<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-				<path stroke-linecap="round" stroke-linejoin="round" d="M14.121 14.121L7.05 9.88m0 4.242l7.071-4.243M21 3l-9 9m0 0l-3 3m3-3l3 3M3 3l9 9" />
+				<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
 			</svg>
 			Export Clip
 		</button>
@@ -71,3 +87,9 @@
 		</span>
 	{/if}
 </div>
+
+{#if clipMode && !hasSelection}
+	<div class="mt-1 text-center text-xs text-orange-400/80">
+		Click a start point on the timeline, then click the end point
+	</div>
+{/if}
