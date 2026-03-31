@@ -369,3 +369,50 @@ def add_health_check_job(interval_seconds: int = 300) -> None:
     logger.info("Health check job scheduled every %ds", interval_seconds)
 
 
+def add_cert_renewal_job() -> None:
+    """Add a daily TLS certificate renewal check job.
+
+    Runs once per day (every 86400 seconds).  The job opens its own DB session,
+    checks whether renewal is needed (< 30 days to expiry or no cert), and
+    calls renew_certificate() if so.
+    """
+    async def _run_renewal():
+        from app.database import SessionLocal
+        from app.services.tls import check_renewal_needed, renew_certificate
+
+        if not check_renewal_needed():
+            logger.debug("TLS cert renewal check: certificate is healthy, no action needed")
+            return
+        db = SessionLocal()
+        try:
+            logger.info("TLS cert renewal check: renewal required, starting acquisition")
+            ok = renew_certificate(db)
+            if ok:
+                logger.info("TLS cert renewal: certificate renewed successfully")
+            else:
+                logger.error("TLS cert renewal: renewal failed — check logs for ACME errors")
+        except Exception:
+            logger.exception("TLS cert renewal job encountered an unexpected error")
+        finally:
+            db.rollback()
+            db.close()
+
+    scheduler.add_job(
+        _run_renewal,
+        "interval",
+        seconds=86400,
+        id="cert_renewal",
+        replace_existing=True,
+    )
+    logger.info("TLS certificate renewal job scheduled every 86400s")
+
+
+def remove_cert_renewal_job() -> None:
+    """Remove the TLS certificate renewal job."""
+    try:
+        scheduler.remove_job("cert_renewal")
+        logger.info("Removed TLS certificate renewal job")
+    except Exception:
+        logger.debug("Cert renewal job not found, nothing to remove")
+
+

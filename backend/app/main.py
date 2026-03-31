@@ -4,7 +4,7 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from app.config import settings as app_settings
 from app.database import SessionLocal, engine
 from app.migrations.runner import run_migrations
-from app.routers import captures, cleanup_schedules, notifications, profile_templates, profiles, settings as settings_router, statistics, streams, system, timelapse_schedules, timelapses
+from app.routers import captures, cleanup_schedules, notifications, profile_templates, profiles, settings as settings_router, statistics, streams, system, timelapse_schedules, timelapses, tls as tls_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -62,10 +62,11 @@ async def lifespan(app: FastAPI):
     if gap_enabled:
         add_capture_gap_job()
 
-    from app.services.scheduler import add_segment_scanner_job, add_recording_cleanup_job, add_watermark_check_job
+    from app.services.scheduler import add_segment_scanner_job, add_recording_cleanup_job, add_watermark_check_job, add_cert_renewal_job
     add_segment_scanner_job()
     add_recording_cleanup_job()
     add_watermark_check_job()
+    add_cert_renewal_job()
 
     from app.services.generation_queue import start_worker
     start_worker()
@@ -98,6 +99,33 @@ app.add_middleware(
 from starlette.middleware.sessions import SessionMiddleware  # noqa: E402
 app.add_middleware(SessionMiddleware, secret_key=app_settings.SECRET_KEY)
 
+# HTTP → HTTPS redirect middleware
+# Skips ACME challenge paths (/.well-known/acme-challenge/) so Let's Encrypt
+# validation can reach the challenge handler over plain HTTP.
+# Honours X-Forwarded-Proto for deployments behind a reverse proxy.
+from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
+from starlette.requests import Request as StarletteRequest  # noqa: E402
+from starlette.responses import RedirectResponse  # noqa: E402
+
+
+class HTTPSRedirectMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: StarletteRequest, call_next):
+        if not app_settings.TLS_ENABLED:
+            return await call_next(request)
+        # Skip ACME challenge paths
+        if request.url.path.startswith("/.well-known/acme-challenge/"):
+            return await call_next(request)
+        # Determine whether connection is already HTTPS
+        proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+        if proto == "https":
+            return await call_next(request)
+        # Redirect HTTP → HTTPS (301 permanent)
+        https_url = request.url.replace(scheme="https")
+        return RedirectResponse(url=str(https_url), status_code=301)
+
+
+app.add_middleware(HTTPSRedirectMiddleware)
+
 # API routers
 app.include_router(system.router)
 app.include_router(streams.router)
@@ -117,6 +145,8 @@ app.include_router(playback_router.router)
 from app.routers import exports as exports_router
 app.include_router(exports_router.router)
 
+app.include_router(tls_router.router)
+
 from app.routers import auth as auth_router
 app.include_router(auth_router.router)
 
@@ -130,6 +160,16 @@ app.mount("/static/captures", StaticFiles(directory=str(captures_dir)), name="st
 timelapses_dir = data_dir / "timelapses"
 timelapses_dir.mkdir(exist_ok=True)
 app.mount("/static/timelapses", StaticFiles(directory=str(timelapses_dir)), name="static_timelapses")
+
+# ACME HTTP-01 challenge route — unauthenticated, MUST be before the SPA catch-all
+@app.get("/.well-known/acme-challenge/{token}", include_in_schema=False)
+async def acme_challenge(token: str):
+    from fastapi.responses import PlainTextResponse
+    from app.services.tls import get_challenge_response
+    key_auth = get_challenge_response(token)
+    if key_auth is None:
+        raise HTTPException(status_code=404, detail="Challenge token not found")
+    return PlainTextResponse(key_auth)
 
 # Serve frontend build if it exists (SPA with fallback)
 _candidates = [
