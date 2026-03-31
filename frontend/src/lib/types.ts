@@ -341,6 +341,10 @@ export interface RecordingStorageProfile {
 	newest_recording: string | null;
 }
 
+export interface RecordingRetentionConfig {
+	default_retention_days: number;
+}
+
 export interface RecordingStorageStats {
 	total_segments: number;
 	total_bytes: number;

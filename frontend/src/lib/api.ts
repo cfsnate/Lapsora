@@ -1,4 +1,4 @@
-import type { Stream, StreamCreate, StreamUpdate, Profile, ProfileCreate, ProfileUpdate, ProfileTemplate, ProfileTemplateCreate, Capture, Timelapse, TimelapseGenerate, TimelapseSchedule, TimelapseScheduleCreate, TimelapseScheduleUpdate, CleanupSchedule, CleanupScheduleCreate, CleanupScheduleUpdate, TestResult, StorageStats, Notification, NotificationURL, HealthConfig, NotificationEventsConfig, LocationConfig, CaptureGapConfig, TimeFormatConfig, StatsSummary, StorageTrendPoint, CaptureActivityPoint, ProfileStoragePoint, Go2rtcConfig, Go2rtcStreamInfo, TimelapseSummary, RecordingStatus, RecordingStorageStats, PlaybackAvailabilityRange, ClipExport, ClipExportCreate } from './types';
+import type { Stream, StreamCreate, StreamUpdate, Profile, ProfileCreate, ProfileUpdate, ProfileTemplate, ProfileTemplateCreate, Capture, Timelapse, TimelapseGenerate, TimelapseSchedule, TimelapseScheduleCreate, TimelapseScheduleUpdate, CleanupSchedule, CleanupScheduleCreate, CleanupScheduleUpdate, TestResult, StorageStats, Notification, NotificationURL, HealthConfig, NotificationEventsConfig, LocationConfig, CaptureGapConfig, TimeFormatConfig, StatsSummary, StorageTrendPoint, CaptureActivityPoint, ProfileStoragePoint, Go2rtcConfig, Go2rtcStreamInfo, TimelapseSummary, RecordingStatus, RecordingStorageStats, RecordingRetentionConfig, PlaybackAvailabilityRange, ClipExport, ClipExportCreate } from './types';
 
 const BASE = '/api';
 
@@ -156,6 +156,10 @@ export const api = {
 	},
 	getTimelapseSummary: () => request<TimelapseSummary>('/statistics/timelapse-summary'),
 	getRecordingStorage: () => request<RecordingStorageStats>('/statistics/recording-storage'),
+
+	// Settings — Recording Retention
+	getRecordingRetention: () => request<RecordingRetentionConfig>('/settings/recording-retention'),
+	updateRecordingRetention: (data: RecordingRetentionConfig) => request<RecordingRetentionConfig>('/settings/recording-retention', { method: 'PUT', body: JSON.stringify(data) }),
 
 	// Recording
 	getRecordingStatuses: () => request<Record<string, RecordingStatus>>('/recording/status'),

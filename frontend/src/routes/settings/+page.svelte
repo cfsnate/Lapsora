@@ -41,6 +41,9 @@
 	let timeFormatConfig = $state<TimeFormatConfig>({ use_24h: false });
 	let savingTimeFormat = $state(false);
 
+	let recordingRetentionDays = $state(14);
+	let savingRecordingRetention = $state(false);
+
 	let loading = $state(true);
 	let newLabel = $state('');
 	let newUrl = $state('');
@@ -50,8 +53,8 @@
 	let savingLocation = $state(false);
 
 	$effect(() => {
-		Promise.all([api.getNotificationSettings(), api.getHealthConfig(), api.getLocationConfig(), api.getCaptureGapConfig(), api.getGo2rtcConfig(), api.getTimeFormatConfig()])
-			.then(([notifSettings, hc, loc, gapCfg, g2rCfg, tfCfg]) => {
+		Promise.all([api.getNotificationSettings(), api.getHealthConfig(), api.getLocationConfig(), api.getCaptureGapConfig(), api.getGo2rtcConfig(), api.getTimeFormatConfig(), api.getRecordingRetention()])
+			.then(([notifSettings, hc, loc, gapCfg, g2rCfg, tfCfg, rrCfg]) => {
 				urls = notifSettings.urls;
 				events = notifSettings.events;
 				healthConfig = hc;
@@ -59,6 +62,7 @@
 				captureGapConfig = gapCfg;
 				go2rtcConfig = g2rCfg;
 				timeFormatConfig = tfCfg;
+				recordingRetentionDays = rrCfg.default_retention_days;
 			})
 			.finally(() => {
 				loading = false;
@@ -171,6 +175,17 @@
 			alert(err instanceof Error ? err.message : 'Failed to save time format');
 		} finally {
 			savingTimeFormat = false;
+		}
+	}
+
+	async function saveRecordingRetention() {
+		savingRecordingRetention = true;
+		try {
+			await api.updateRecordingRetention({ default_retention_days: recordingRetentionDays });
+		} catch (err) {
+			alert(err instanceof Error ? err.message : 'Failed to save recording retention');
+		} finally {
+			savingRecordingRetention = false;
 		}
 	}
 
@@ -467,11 +482,39 @@
 				</button>
 			</div>
 
+			<!-- Recording Retention -->
+			<div class="rounded-xl border border-gray-800 bg-gray-900 p-6">
+				<h3 class="mb-2 text-lg font-medium text-white">Recording Retention</h3>
+				<p class="mb-4 text-sm text-gray-400">
+					Default retention period for continuous recordings. Recordings older than this are automatically deleted. Individual profiles can override this in their recording settings.
+				</p>
+				<div class="flex items-end gap-3">
+					<div>
+						<label for="recording-retention" class="mb-1 block text-sm font-medium text-gray-300">Retention (days)</label>
+						<input
+							id="recording-retention"
+							type="number"
+							bind:value={recordingRetentionDays}
+							min="1"
+							max="365"
+							class="w-32 rounded-md border border-gray-600 bg-gray-900 px-3 py-2 text-gray-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+						/>
+					</div>
+					<button
+						onclick={saveRecordingRetention}
+						disabled={savingRecordingRetention}
+						class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50"
+					>
+						{savingRecordingRetention ? 'Saving...' : 'Save'}
+					</button>
+				</div>
+			</div>
+
 			<!-- Data Cleanup -->
 			<div>
-				<h3 class="mb-2 text-lg font-medium text-white">Data Cleanup</h3>
+				<h3 class="mb-2 text-lg font-medium text-white">Snapshot & Timelapse Cleanup</h3>
 				<p class="mb-4 text-sm text-gray-400">
-					Configure per-profile cleanup schedules to automatically remove old snapshots and timelapses. Recording retention is configured separately in each profile's recording settings.
+					Configure per-profile cleanup schedules to automatically remove old snapshots and timelapses.
 				</p>
 				<CleanupScheduleManager />
 			</div>
