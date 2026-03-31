@@ -8,10 +8,11 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.models import Capture
+from app.dependencies import get_current_user
+from app.models import Capture, User
 from app.schemas import BulkDeleteRequest, CaptureRead
 
-router = APIRouter(prefix="/api", tags=["captures"])
+router = APIRouter(prefix="/api", tags=["captures"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("/profiles/{profile_id}/captures", response_model=list[CaptureRead])

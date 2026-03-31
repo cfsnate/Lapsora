@@ -9,11 +9,12 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.models import ClipExport
+from app.dependencies import get_current_user
+from app.models import ClipExport, User
 from app.schemas import ClipExportCreate, ClipExportRead
 from app.services.export_queue import cancel_export, enqueue_export
 
-router = APIRouter(prefix="/api/exports", tags=["exports"])
+router = APIRouter(prefix="/api/exports", tags=["exports"], dependencies=[Depends(get_current_user)])
 
 
 @router.post("/", status_code=202)

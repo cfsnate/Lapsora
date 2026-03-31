@@ -10,12 +10,13 @@ from sqlalchemy.orm import Session
 from sse_starlette.sse import EventSourceResponse
 
 from app.database import get_db
-from app.models import Notification
+from app.dependencies import get_current_user
+from app.models import Notification, User
 from app.schemas import NotificationRead
 from app.services.notifications import _sse_lock, sse_queues
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/notifications", tags=["notifications"])
+router = APIRouter(prefix="/api/notifications", tags=["notifications"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("/", response_model=list[NotificationRead])

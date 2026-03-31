@@ -8,7 +8,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Profile, TimelapseSchedule
+from app.dependencies import get_current_user
+from app.models import Profile, TimelapseSchedule, User
 from app.schemas import (
     TimelapseScheduleCreate,
     TimelapseScheduleRead,
@@ -22,7 +23,7 @@ from app.services.scheduler import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/timelapse-schedules", tags=["timelapse-schedules"])
+router = APIRouter(prefix="/api/timelapse-schedules", tags=["timelapse-schedules"], dependencies=[Depends(get_current_user)])
 
 PRESET_CRONS = {
     "daily": "5 0 * * *",

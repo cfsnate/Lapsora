@@ -7,6 +7,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies import get_current_user
 from app.schemas import (
     CaptureActivityPoint,
     ProfileStoragePoint,
@@ -18,7 +19,7 @@ from app.schemas import (
 )
 from app.services.retention import get_recording_storage_stats, get_storage_stats
 
-router = APIRouter(prefix="/api/statistics", tags=["statistics"])
+router = APIRouter(prefix="/api/statistics", tags=["statistics"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("/summary", response_model=StatsSummary)

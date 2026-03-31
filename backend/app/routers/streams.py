@@ -7,13 +7,14 @@ from sqlalchemy.orm import Session
 
 from app.config import decrypt, encrypt, settings
 from app.database import get_db
-from app.models import Setting, Stream
+from app.dependencies import get_current_user
+from app.models import Setting, Stream, User
 from app.schemas import StreamCreate, StreamRead, StreamUpdate
 from app.services import rtsp
 from app.services import go2rtc
 from app.services.live_hls import live_hls_manager
 
-router = APIRouter(prefix="/api/streams", tags=["streams"])
+router = APIRouter(prefix="/api/streams", tags=["streams"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("/", response_model=list[StreamRead])

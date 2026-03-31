@@ -8,11 +8,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Timelapse
+from app.dependencies import get_current_user
+from app.models import Timelapse, User
 from app.schemas import BulkDeleteRequest, TimelapseGenerate, TimelapseRead
 from app.services.generation_queue import enqueue_generation
 
-router = APIRouter(prefix="/api", tags=["timelapses"])
+router = APIRouter(prefix="/api", tags=["timelapses"], dependencies=[Depends(get_current_user)])
 
 MEDIA_TYPES = {
     "mp4": "video/mp4",

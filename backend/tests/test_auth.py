@@ -309,3 +309,39 @@ def test_me_after_logout_returns_401(client: TestClient):
     client.post(LOGOUT_URL)
     resp = client.get(ME_URL)
     assert resp.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Protected route integration tests (T02)
+# ---------------------------------------------------------------------------
+
+STREAMS_URL = "/api/streams/"
+STATISTICS_URL = "/api/statistics/summary"
+HEALTH_URL = "/api/health"
+
+
+def test_streams_without_cookie_returns_401(client: TestClient):
+    resp = client.get(STREAMS_URL)
+    assert resp.status_code == 401
+
+
+def test_statistics_without_cookie_returns_401(client: TestClient):
+    resp = client.get(STATISTICS_URL)
+    assert resp.status_code == 401
+
+
+def test_setup_status_without_cookie_returns_200(client: TestClient):
+    resp = client.get(STATUS_URL)
+    assert resp.status_code == 200
+
+
+def test_health_without_cookie_returns_200(client: TestClient):
+    resp = client.get(HEALTH_URL)
+    assert resp.status_code == 200
+
+
+def test_streams_with_valid_cookie_returns_200(client: TestClient):
+    _setup_and_login(client)
+    resp = client.get(STREAMS_URL)
+    assert resp.status_code == 200
+    assert isinstance(resp.json(), list)

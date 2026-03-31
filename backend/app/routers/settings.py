@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 
 from app.config import encrypt
 from app.database import get_db
-from app.models import NotificationURL, Setting
+from app.dependencies import get_current_user
+from app.models import NotificationURL, Setting, User
 from app.schemas import (
     CaptureGapUpdate,
     Go2rtcConfig,
@@ -23,7 +24,7 @@ from app.schemas import (
 )
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/settings", tags=["settings"])
+router = APIRouter(prefix="/api/settings", tags=["settings"], dependencies=[Depends(get_current_user)])
 
 
 # --- Notification URLs ---

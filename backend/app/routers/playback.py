@@ -10,10 +10,11 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.models import RecordingSegment
+from app.dependencies import get_current_user
+from app.models import RecordingSegment, User
 from app.services.playback import generate_playlist, get_availability_ranges
 
-router = APIRouter(prefix="/api/playback", tags=["playback"])
+router = APIRouter(prefix="/api/playback", tags=["playback"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("/{profile_id}/playlist")

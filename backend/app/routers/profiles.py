@@ -9,13 +9,14 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.models import Profile, Stream
+from app.dependencies import get_current_user
+from app.models import Profile, Stream, User
 from app.schemas import ProfileCreate, ProfileRead, ProfileUpdate
 from app.services import scheduler
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api", tags=["profiles"])
+router = APIRouter(prefix="/api", tags=["profiles"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("/streams/{stream_id}/profiles", response_model=list[ProfileRead])

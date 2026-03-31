@@ -1,7 +1,9 @@
 """System health and info endpoints."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.dependencies import get_current_user
+from app.models import User
 from app.services.gpu import detect_nvidia_gpu, get_nvenc_encoders, is_nvenc_available, is_cupy_available
 from app.services.generation_progress import get_active_generations
 from app.services.generation_queue import get_queue_status
@@ -15,22 +17,22 @@ def health():
     return {"status": "ok", "version": "0.1.0"}
 
 
-@router.get("/storage")
+@router.get("/storage", dependencies=[Depends(get_current_user)])
 def storage():
     return get_storage_stats()
 
 
-@router.get("/generations/active")
+@router.get("/generations/active", dependencies=[Depends(get_current_user)])
 def active_generations():
     return get_active_generations()
 
 
-@router.get("/generations/queue")
+@router.get("/generations/queue", dependencies=[Depends(get_current_user)])
 def queued_generations():
     return get_queue_status()
 
 
-@router.delete("/generations/{generation_id}")
+@router.delete("/generations/{generation_id}", dependencies=[Depends(get_current_user)])
 def cancel_generation_endpoint(generation_id: str):
     from app.services.generation_queue import cancel_generation
     success = cancel_generation(generation_id)
@@ -39,7 +41,7 @@ def cancel_generation_endpoint(generation_id: str):
     return {"status": "cancelled", "generation_id": generation_id}
 
 
-@router.get("/system/info")
+@router.get("/system/info", dependencies=[Depends(get_current_user)])
 def system_info():
     gpu = detect_nvidia_gpu()
     encoders = get_nvenc_encoders() if gpu else {}

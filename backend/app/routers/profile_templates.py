@@ -6,7 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Profile, ProfileTemplate, Stream
+from app.dependencies import get_current_user
+from app.models import Profile, ProfileTemplate, Stream, User
 from app.schemas import (
     ApplyTemplateRequest,
     ProfileRead,
@@ -18,7 +19,7 @@ from app.services import scheduler
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/profile-templates", tags=["profile-templates"])
+router = APIRouter(prefix="/api/profile-templates", tags=["profile-templates"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("/", response_model=list[ProfileTemplateRead])

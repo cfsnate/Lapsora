@@ -8,7 +8,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import CleanupSchedule, Profile
+from app.dependencies import get_current_user
+from app.models import CleanupSchedule, Profile, User
 from app.schemas import (
     CleanupScheduleCreate,
     CleanupScheduleRead,
@@ -22,7 +23,7 @@ from app.services.scheduler import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/cleanup-schedules", tags=["cleanup-schedules"])
+router = APIRouter(prefix="/api/cleanup-schedules", tags=["cleanup-schedules"], dependencies=[Depends(get_current_user)])
 
 
 def _validate_cron(expr: str) -> None:

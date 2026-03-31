@@ -7,12 +7,13 @@ from sqlalchemy import func, or_, update
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import RecordingSegment
+from app.dependencies import get_current_user
+from app.models import RecordingSegment, User
 from app.schemas import ProtectRequest, ProtectResponse
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/recording", tags=["recording"])
+router = APIRouter(prefix="/api/recording", tags=["recording"], dependencies=[Depends(get_current_user)])
 
 
 @router.get("/status")
