@@ -13,8 +13,11 @@ from sqlalchemy.orm import Session
 from app.config import decrypt, encrypt, settings
 from app.database import get_db
 from app.dependencies import get_current_user, require_admin
-from app.models import Profile, Setting, User, UserProfileAccess
+from app.models import Group, GroupProfileAccess, OIDCGroupMapping, Profile, Setting, User, UserProfileAccess
 from app.schemas import (
+    GroupCreate,
+    GroupRead,
+    GroupUpdate,
     LoginRequest,
     OIDCConfigRead,
     OIDCConfigUpdate,
@@ -350,6 +353,160 @@ def set_user_profiles(
 
 
 # ---------------------------------------------------------------------------
+# Group management helpers
+# ---------------------------------------------------------------------------
+
+
+def _build_group_read(group: Group, db: Session) -> GroupRead:
+    """Build a GroupRead by querying junction tables for profile IDs and OIDC mapping names."""
+    profile_rows = db.query(GroupProfileAccess).filter(GroupProfileAccess.group_id == group.id).all()
+    mapping_rows = db.query(OIDCGroupMapping).filter(OIDCGroupMapping.group_id == group.id).all()
+    return GroupRead(
+        id=group.id,
+        name=group.name,
+        role=group.role,
+        profile_ids=[row.profile_id for row in profile_rows],
+        oidc_group_names=[row.oidc_group_name for row in mapping_rows],
+        created_at=group.created_at,
+        updated_at=group.updated_at,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Group CRUD endpoints (admin-only)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/groups", response_model=list[GroupRead])
+def list_groups(
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """List all groups with their profile IDs and OIDC mapping names."""
+    groups = db.query(Group).all()
+    return [_build_group_read(g, db) for g in groups]
+
+
+@router.post("/groups", response_model=GroupRead, status_code=201)
+def create_group(
+    payload: GroupCreate,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Create a group with optional profile access and OIDC mappings."""
+    if db.query(Group).filter(Group.name == payload.name).first():
+        raise HTTPException(status_code=409, detail="group_name_taken")
+
+    if payload.role not in ("admin", "user"):
+        raise HTTPException(status_code=400, detail="invalid_role")
+
+    # Validate profile IDs exist
+    if payload.profile_ids:
+        existing = {r.id for r in db.query(Profile.id).filter(Profile.id.in_(payload.profile_ids)).all()}
+        missing = set(payload.profile_ids) - existing
+        if missing:
+            raise HTTPException(status_code=400, detail=f"profile_ids_not_found: {sorted(missing)}")
+
+    # Check for OIDC group name conflicts
+    if payload.oidc_group_names:
+        conflicts = (
+            db.query(OIDCGroupMapping)
+            .filter(OIDCGroupMapping.oidc_group_name.in_(payload.oidc_group_names))
+            .all()
+        )
+        if conflicts:
+            taken = [c.oidc_group_name for c in conflicts]
+            raise HTTPException(status_code=409, detail=f"oidc_group_names_taken: {taken}")
+
+    group = Group(name=payload.name, role=payload.role)
+    db.add(group)
+    db.flush()  # get group.id
+
+    for pid in payload.profile_ids:
+        db.add(GroupProfileAccess(group_id=group.id, profile_id=pid))
+    for name in payload.oidc_group_names:
+        db.add(OIDCGroupMapping(group_id=group.id, oidc_group_name=name))
+
+    db.commit()
+    db.refresh(group)
+    return _build_group_read(group, db)
+
+
+@router.put("/groups/{group_id}", response_model=GroupRead)
+def update_group(
+    group_id: int,
+    payload: GroupUpdate,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Update a group's name, role, profile access, and/or OIDC mappings."""
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if group is None:
+        raise HTTPException(status_code=404, detail="group_not_found")
+
+    if payload.name is not None:
+        existing = db.query(Group).filter(Group.name == payload.name, Group.id != group_id).first()
+        if existing:
+            raise HTTPException(status_code=409, detail="group_name_taken")
+        group.name = payload.name
+
+    if payload.role is not None:
+        if payload.role not in ("admin", "user"):
+            raise HTTPException(status_code=400, detail="invalid_role")
+        group.role = payload.role
+
+    if payload.profile_ids is not None:
+        if payload.profile_ids:
+            existing = {r.id for r in db.query(Profile.id).filter(Profile.id.in_(payload.profile_ids)).all()}
+            missing = set(payload.profile_ids) - existing
+            if missing:
+                raise HTTPException(status_code=400, detail=f"profile_ids_not_found: {sorted(missing)}")
+
+        db.query(GroupProfileAccess).filter(GroupProfileAccess.group_id == group_id).delete()
+        for pid in payload.profile_ids:
+            db.add(GroupProfileAccess(group_id=group_id, profile_id=pid))
+
+    if payload.oidc_group_names is not None:
+        # Check conflicts with OTHER groups
+        if payload.oidc_group_names:
+            conflicts = (
+                db.query(OIDCGroupMapping)
+                .filter(
+                    OIDCGroupMapping.oidc_group_name.in_(payload.oidc_group_names),
+                    OIDCGroupMapping.group_id != group_id,
+                )
+                .all()
+            )
+            if conflicts:
+                taken = [c.oidc_group_name for c in conflicts]
+                raise HTTPException(status_code=409, detail=f"oidc_group_names_taken: {taken}")
+
+        db.query(OIDCGroupMapping).filter(OIDCGroupMapping.group_id == group_id).delete()
+        for name in payload.oidc_group_names:
+            db.add(OIDCGroupMapping(group_id=group_id, oidc_group_name=name))
+
+    db.commit()
+    db.refresh(group)
+    return _build_group_read(group, db)
+
+
+@router.delete("/groups/{group_id}", status_code=204)
+def delete_group(
+    group_id: int,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+):
+    """Delete a group and its profile access + OIDC mappings (cascade)."""
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if group is None:
+        raise HTTPException(status_code=404, detail="group_not_found")
+
+    db.delete(group)
+    db.commit()
+    return None
+
+
+# ---------------------------------------------------------------------------
 # OIDC helpers
 # ---------------------------------------------------------------------------
 
@@ -372,6 +529,13 @@ def _get_oidc_client(db: Session) -> tuple[OAuth, str]:
     provider_name = provider_name_row.value if provider_name_row else "oidc"
     issuer_url = issuer_row.value.rstrip("/")
 
+    # Include groups scope if a groups_claim is configured
+    groups_claim_row = db.query(Setting).filter(Setting.key == "oidc_groups_claim").first()
+    groups_claim = groups_claim_row.value if groups_claim_row else "groups"
+    scopes = "openid email profile"
+    if groups_claim:
+        scopes += " " + groups_claim
+
     try:
         oauth = OAuth()
         oauth.register(
@@ -379,7 +543,7 @@ def _get_oidc_client(db: Session) -> tuple[OAuth, str]:
             client_id=client_id_row.value,
             client_secret=client_secret,
             server_metadata_url=f"{issuer_url}/.well-known/openid-configuration",
-            client_kwargs={"scope": "openid email profile"},
+            client_kwargs={"scope": scopes},
         )
     except Exception as exc:
         logger.warning("OIDC provider discovery failed: %s", exc)
@@ -470,6 +634,7 @@ def get_oidc_config(db: Session = Depends(get_db)):
     """Return OIDC config status (public — no auth required)."""
     issuer_row = db.query(Setting).filter(Setting.key == "oidc_issuer_url").first()
     provider_name_row = db.query(Setting).filter(Setting.key == "oidc_provider_name").first()
+    groups_claim_row = db.query(Setting).filter(Setting.key == "oidc_groups_claim").first()
 
     if not issuer_row:
         return OIDCConfigRead(enabled=False)
@@ -478,6 +643,7 @@ def get_oidc_config(db: Session = Depends(get_db)):
         enabled=True,
         provider_name=provider_name_row.value if provider_name_row else None,
         issuer_url=issuer_row.value,
+        groups_claim=groups_claim_row.value if groups_claim_row else "groups",
     )
 
 
@@ -503,6 +669,8 @@ def put_oidc_config(
     _upsert("oidc_client_secret", encrypted_secret)
     if payload.provider_name is not None:
         _upsert("oidc_provider_name", payload.provider_name)
+    if payload.groups_claim is not None:
+        _upsert("oidc_groups_claim", payload.groups_claim)
     db.commit()
 
     return OIDCConfigRead(
