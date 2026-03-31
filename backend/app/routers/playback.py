@@ -3,8 +3,9 @@
 import os
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse
+from starlette.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -33,7 +34,7 @@ def get_playlist(
 
 
 @router.get("/segment/{segment_id}")
-def get_segment(segment_id: int, db: Session = Depends(get_db)):
+def get_segment(segment_id: int, request: Request, db: Session = Depends(get_db)):
     segment = db.get(RecordingSegment, segment_id)
     if not segment:
         raise HTTPException(status_code=404, detail="Segment not found")
@@ -42,7 +43,57 @@ def get_segment(segment_id: int, db: Session = Depends(get_db)):
     if not os.path.isfile(abs_path):
         raise HTTPException(status_code=404, detail="Segment file not found on disk")
 
-    return FileResponse(abs_path, media_type="video/mp2t")
+    file_size = os.path.getsize(abs_path)
+    range_header = request.headers.get("range")
+
+    if range_header:
+        # Parse "bytes=START-END" (END is optional)
+        try:
+            range_spec = range_header.replace("bytes=", "").strip()
+            parts = range_spec.split("-")
+            start = int(parts[0])
+            end = int(parts[1]) if parts[1] else file_size - 1
+        except (ValueError, IndexError):
+            raise HTTPException(status_code=416, detail="Invalid range")
+
+        if start >= file_size or end >= file_size or start > end:
+            raise HTTPException(
+                status_code=416,
+                detail="Range not satisfiable",
+                headers={"Content-Range": f"bytes */{file_size}"},
+            )
+
+        length = end - start + 1
+
+        def iter_range():
+            with open(abs_path, "rb") as f:
+                f.seek(start)
+                remaining = length
+                while remaining > 0:
+                    chunk = f.read(min(65536, remaining))
+                    if not chunk:
+                        break
+                    remaining -= len(chunk)
+                    yield chunk
+
+        return StreamingResponse(
+            iter_range(),
+            status_code=206,
+            media_type="video/mp2t",
+            headers={
+                "Content-Range": f"bytes {start}-{end}/{file_size}",
+                "Content-Length": str(length),
+                "Accept-Ranges": "bytes",
+                "Cache-Control": "public, max-age=3600",
+            },
+        )
+
+    # No Range header — return full file
+    return FileResponse(
+        abs_path,
+        media_type="video/mp2t",
+        headers={"Accept-Ranges": "bytes", "Cache-Control": "public, max-age=3600"},
+    )
 
 
 @router.get("/{profile_id}/availability")
