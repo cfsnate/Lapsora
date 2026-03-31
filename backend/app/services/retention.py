@@ -377,7 +377,22 @@ def get_storage_stats() -> dict:
         timelapses_count = tl_stats[0]
         timelapses_size = tl_stats[1]
 
-        total_size = captures_size + timelapses_size
+        rec_stats = db.query(
+            func.count(RecordingSegment.id),
+            func.coalesce(func.sum(RecordingSegment.file_size), 0),
+        ).first()
+        recordings_count = rec_stats[0]
+        recordings_size = rec_stats[1]
+
+        from app.models import ClipExport
+        exp_stats = db.query(
+            func.count(ClipExport.id),
+            func.coalesce(func.sum(ClipExport.file_size), 0),
+        ).filter(ClipExport.status == "complete").first()
+        exports_count = exp_stats[0]
+        exports_size = exp_stats[1]
+
+        total_size = captures_size + timelapses_size + recordings_size + exports_size
 
         # Disk usage
         try:
@@ -393,6 +408,10 @@ def get_storage_stats() -> dict:
             "captures_size_bytes": captures_size,
             "timelapses_count": timelapses_count,
             "timelapses_size_bytes": timelapses_size,
+            "recordings_count": recordings_count,
+            "recordings_size_bytes": recordings_size,
+            "exports_count": exports_count,
+            "exports_size_bytes": exports_size,
             "total_size_bytes": total_size,
             "disk_free_bytes": disk_free,
             "disk_total_bytes": disk_total,

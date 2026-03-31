@@ -327,6 +327,10 @@ export interface StorageStats {
 	captures_size_bytes: number;
 	timelapses_count: number;
 	timelapses_size_bytes: number;
+	recordings_count: number;
+	recordings_size_bytes: number;
+	exports_count: number;
+	exports_size_bytes: number;
 	total_size_bytes: number;
 	disk_free_bytes: number;
 	disk_total_bytes: number;

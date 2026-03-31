@@ -16,33 +16,51 @@
 
 	let capturesPct = $derived(stats.disk_total_bytes > 0 ? (stats.captures_size_bytes / stats.disk_total_bytes) * 100 : 0);
 	let timelapsesPct = $derived(stats.disk_total_bytes > 0 ? (stats.timelapses_size_bytes / stats.disk_total_bytes) * 100 : 0);
+	let recordingsPct = $derived(stats.disk_total_bytes > 0 ? (stats.recordings_size_bytes / stats.disk_total_bytes) * 100 : 0);
+	let exportsPct = $derived(stats.disk_total_bytes > 0 ? (stats.exports_size_bytes / stats.disk_total_bytes) * 100 : 0);
+
 	let capturesDisplay = $derived(capturesPct > 0 ? Math.max(capturesPct, 1) : 0);
 	let timelapsesDisplay = $derived(timelapsesPct > 0 ? Math.max(timelapsesPct, 1) : 0);
-	let freeDisplay = $derived(100 - capturesDisplay - timelapsesDisplay);
+	let recordingsDisplay = $derived(recordingsPct > 0 ? Math.max(recordingsPct, 1) : 0);
+	let exportsDisplay = $derived(exportsPct > 0 ? Math.max(exportsPct, 1) : 0);
+	let usedDisplay = $derived(capturesDisplay + timelapsesDisplay + recordingsDisplay + exportsDisplay);
+	let freeDisplay = $derived(Math.max(0, 100 - usedDisplay));
 </script>
 
 <div class="rounded-lg bg-gray-800 p-4">
 	<h3 class="mb-3 text-lg font-semibold text-gray-100">Storage</h3>
 
 	<div class="mb-4 flex h-4 w-full overflow-hidden rounded-full bg-gray-900">
+		{#if recordingsPct > 0}
+			<div class="bg-green-500" style="width: {recordingsDisplay}%" title="Recordings: {formatBytes(stats.recordings_size_bytes)}"></div>
+		{/if}
 		{#if capturesPct > 0}
 			<div class="bg-blue-500" style="width: {capturesDisplay}%" title="Snapshots: {formatBytes(stats.captures_size_bytes)}"></div>
 		{/if}
 		{#if timelapsesPct > 0}
 			<div class="bg-purple-500" style="width: {timelapsesDisplay}%" title="Timelapses: {formatBytes(stats.timelapses_size_bytes)}"></div>
 		{/if}
+		{#if exportsPct > 0}
+			<div class="bg-orange-500" style="width: {exportsDisplay}%" title="Exports: {formatBytes(stats.exports_size_bytes)}"></div>
+		{/if}
 		{#if freeDisplay > 0}
 			<div class="bg-gray-700" style="width: {freeDisplay}%" title="Free: {formatBytes(stats.disk_free_bytes)}"></div>
 		{/if}
 	</div>
 
-	<div class="mb-2 flex gap-4 text-xs text-gray-400">
+	<div class="mb-2 flex flex-wrap gap-4 text-xs text-gray-400">
+		<span class="flex items-center gap-1"><span class="inline-block h-2 w-2 rounded-full bg-green-500"></span> Recordings</span>
 		<span class="flex items-center gap-1"><span class="inline-block h-2 w-2 rounded-full bg-blue-500"></span> Snapshots</span>
 		<span class="flex items-center gap-1"><span class="inline-block h-2 w-2 rounded-full bg-purple-500"></span> Timelapses</span>
+		<span class="flex items-center gap-1"><span class="inline-block h-2 w-2 rounded-full bg-orange-500"></span> Exports</span>
 		<span class="flex items-center gap-1"><span class="inline-block h-2 w-2 rounded-full bg-gray-700"></span> Free</span>
 	</div>
 
 	<div class="grid grid-cols-2 gap-3 text-sm">
+		<div>
+			<span class="text-gray-500">Recordings:</span>
+			<span class="ml-1 text-gray-300">{stats.recordings_count} segments ({formatBytes(stats.recordings_size_bytes)})</span>
+		</div>
 		<div>
 			<span class="text-gray-500">Snapshots:</span>
 			<span class="ml-1 text-gray-300">{stats.captures_count} ({formatBytes(stats.captures_size_bytes)})</span>
@@ -50,6 +68,10 @@
 		<div>
 			<span class="text-gray-500">Timelapses:</span>
 			<span class="ml-1 text-gray-300">{stats.timelapses_count} ({formatBytes(stats.timelapses_size_bytes)})</span>
+		</div>
+		<div>
+			<span class="text-gray-500">Exports:</span>
+			<span class="ml-1 text-gray-300">{stats.exports_count} ({formatBytes(stats.exports_size_bytes)})</span>
 		</div>
 		<div>
 			<span class="text-gray-500">Total used:</span>

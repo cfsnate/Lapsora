@@ -223,22 +223,26 @@
 		<!-- Disk Usage Breakdown -->
 		{#if storageStats}
 			{@const capturesBytes = storageStats.captures_size_bytes}
-			{@const recordingBytes = recordingStorage?.total_bytes ?? 0}
+			{@const recordingBytes = storageStats.recordings_size_bytes}
 			{@const timelapsesBytes = storageStats.timelapses_size_bytes}
-			{@const otherBytes = Math.max(0, storageStats.disk_total_bytes - storageStats.disk_free_bytes - storageStats.total_size_bytes - recordingBytes)}
+			{@const exportsBytes = storageStats.exports_size_bytes}
+			{@const otherBytes = Math.max(0, storageStats.disk_total_bytes - storageStats.disk_free_bytes - storageStats.total_size_bytes)}
 			{@const freeBytes = storageStats.disk_free_bytes}
 			{@const totalDisk = storageStats.disk_total_bytes || 1}
 			<div class="rounded-lg border border-gray-800 bg-gray-900 p-4">
 				<h2 class="mb-3 text-lg font-semibold text-white">Disk Usage Breakdown</h2>
 				<div class="mb-4 flex h-6 w-full overflow-hidden rounded-full bg-gray-800">
-					{#if capturesBytes > 0}
-						<div class="bg-blue-500 transition-all" style="width: {(capturesBytes / totalDisk) * 100}%" title="Snapshots: {formatBytes(capturesBytes)}"></div>
-					{/if}
 					{#if recordingBytes > 0}
 						<div class="bg-green-500 transition-all" style="width: {(recordingBytes / totalDisk) * 100}%" title="Recordings: {formatBytes(recordingBytes)}"></div>
 					{/if}
+					{#if capturesBytes > 0}
+						<div class="bg-blue-500 transition-all" style="width: {(capturesBytes / totalDisk) * 100}%" title="Snapshots: {formatBytes(capturesBytes)}"></div>
+					{/if}
 					{#if timelapsesBytes > 0}
 						<div class="bg-purple-500 transition-all" style="width: {(timelapsesBytes / totalDisk) * 100}%" title="Timelapses: {formatBytes(timelapsesBytes)}"></div>
+					{/if}
+					{#if exportsBytes > 0}
+						<div class="bg-orange-500 transition-all" style="width: {(exportsBytes / totalDisk) * 100}%" title="Exports: {formatBytes(exportsBytes)}"></div>
 					{/if}
 					{#if otherBytes > 0}
 						<div class="bg-yellow-500 transition-all" style="width: {(otherBytes / totalDisk) * 100}%" title="Other: {formatBytes(otherBytes)}"></div>
@@ -247,14 +251,7 @@
 						<div class="bg-gray-600 transition-all" style="width: {(freeBytes / totalDisk) * 100}%" title="Free: {formatBytes(freeBytes)}"></div>
 					{/if}
 				</div>
-				<div class="grid grid-cols-2 gap-4 sm:grid-cols-5">
-					<div class="rounded-lg border border-gray-800 bg-gray-950 p-3">
-						<div class="flex items-center gap-2">
-							<div class="h-3 w-3 rounded-full bg-blue-500"></div>
-							<p class="text-sm text-gray-400">Snapshots</p>
-						</div>
-						<p class="mt-1 text-lg font-bold text-white">{formatBytes(capturesBytes)}</p>
-					</div>
+				<div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
 					<div class="rounded-lg border border-gray-800 bg-gray-950 p-3">
 						<div class="flex items-center gap-2">
 							<div class="h-3 w-3 rounded-full bg-green-500"></div>
@@ -264,10 +261,24 @@
 					</div>
 					<div class="rounded-lg border border-gray-800 bg-gray-950 p-3">
 						<div class="flex items-center gap-2">
+							<div class="h-3 w-3 rounded-full bg-blue-500"></div>
+							<p class="text-sm text-gray-400">Snapshots</p>
+						</div>
+						<p class="mt-1 text-lg font-bold text-white">{formatBytes(capturesBytes)}</p>
+					</div>
+					<div class="rounded-lg border border-gray-800 bg-gray-950 p-3">
+						<div class="flex items-center gap-2">
 							<div class="h-3 w-3 rounded-full bg-purple-500"></div>
 							<p class="text-sm text-gray-400">Timelapses</p>
 						</div>
 						<p class="mt-1 text-lg font-bold text-white">{formatBytes(timelapsesBytes)}</p>
+					</div>
+					<div class="rounded-lg border border-gray-800 bg-gray-950 p-3">
+						<div class="flex items-center gap-2">
+							<div class="h-3 w-3 rounded-full bg-orange-500"></div>
+							<p class="text-sm text-gray-400">Exports</p>
+						</div>
+						<p class="mt-1 text-lg font-bold text-white">{formatBytes(exportsBytes)}</p>
 					</div>
 					<div class="rounded-lg border border-gray-800 bg-gray-950 p-3">
 						<div class="flex items-center gap-2">
