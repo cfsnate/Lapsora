@@ -528,8 +528,18 @@ export interface LoginCredentials {
 
 // --- User management (admin + self-service) ---
 
+export interface ProfilePermission {
+	profile_id: number;
+	can_view: boolean;
+	can_export: boolean;
+	can_timelapse: boolean;
+	can_manage: boolean;
+}
+
 export interface UserAdminRead extends AuthUser {
 	accessible_profile_ids: number[];
+	profile_permissions: ProfilePermission[];
+	group_ids: number[];
 }
 
 export interface UserCreate {
@@ -551,6 +561,11 @@ export interface UserUpdate {
 
 export interface UserProfileAccessUpdate {
 	profile_ids: number[];
+	profile_permissions: ProfilePermission[];
+}
+
+export interface UserGroupMembershipUpdate {
+	group_ids: number[];
 }
 
 export interface SelfUpdate {
@@ -566,7 +581,9 @@ export interface GroupRead {
 	name: string;
 	role: string;
 	profile_ids: number[];
+	profile_permissions: ProfilePermission[];
 	oidc_group_names: string[];
+	member_user_ids: number[];
 	created_at: string;
 	updated_at: string;
 }
@@ -575,6 +592,7 @@ export interface GroupCreate {
 	name: string;
 	role?: string;
 	profile_ids?: number[];
+	profile_permissions?: ProfilePermission[];
 	oidc_group_names?: string[];
 }
 
@@ -582,6 +600,7 @@ export interface GroupUpdate {
 	name?: string;
 	role?: string;
 	profile_ids?: number[];
+	profile_permissions?: ProfilePermission[];
 	oidc_group_names?: string[];
 }
 

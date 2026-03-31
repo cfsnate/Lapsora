@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { api } from '$lib/api';
-	import type { GroupRead, GroupCreate, GroupUpdate, Stream, Profile } from '$lib/types';
+	import type { GroupRead, GroupCreate, GroupUpdate, Stream, Profile, ProfilePermission } from '$lib/types';
 
 	// ── State ────────────────────────────────────────────────────────────────
 	let loading = $state(true);
@@ -23,7 +23,7 @@
 
 	// Profile access modal
 	let profileAccessGroupId = $state<number | null>(null);
-	let selectedProfileIds = $state<Set<number>>(new Set());
+	let profilePerms = $state<Map<number, ProfilePermission>>(new Map());
 	let savingProfiles = $state(false);
 
 	// OIDC mapping editor
@@ -113,13 +113,30 @@
 	// ── Profile access modal ─────────────────────────────────────────────────
 	function openProfileAccess(group: GroupRead) {
 		profileAccessGroupId = group.id;
-		selectedProfileIds = new Set(group.profile_ids);
+		const map = new Map<number, ProfilePermission>();
+		for (const pp of group.profile_permissions) {
+			map.set(pp.profile_id, pp);
+		}
+		profilePerms = map;
 	}
 
 	function toggleProfile(profileId: number) {
-		const next = new Set(selectedProfileIds);
-		if (next.has(profileId)) next.delete(profileId); else next.add(profileId);
-		selectedProfileIds = next;
+		const next = new Map(profilePerms);
+		if (next.has(profileId)) {
+			next.delete(profileId);
+		} else {
+			next.set(profileId, { profile_id: profileId, can_view: true, can_export: false, can_timelapse: false, can_manage: false });
+		}
+		profilePerms = next;
+	}
+
+	function togglePerm(profileId: number, perm: keyof ProfilePermission) {
+		if (perm === 'profile_id') return;
+		const pp = profilePerms.get(profileId);
+		if (!pp) return;
+		const next = new Map(profilePerms);
+		next.set(profileId, { ...pp, [perm]: !pp[perm] });
+		profilePerms = next;
 	}
 
 	async function saveProfileAccess() {
@@ -127,7 +144,7 @@
 		savingProfiles = true;
 		try {
 			const updated = await api.updateGroup(profileAccessGroupId, {
-				profile_ids: [...selectedProfileIds]
+				profile_permissions: [...profilePerms.values()]
 			});
 			groups = groups.map((g) => (g.id === updated.id ? updated : g));
 			profileAccessGroupId = null;
@@ -305,19 +322,44 @@
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onclick={() => (profileAccessGroupId = null)} onkeydown={() => {}}>
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div class="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-xl border border-gray-700 bg-gray-900 p-6" onclick={(e) => e.stopPropagation()} onkeydown={() => {}}>
-			<h2 class="mb-4 text-lg font-medium text-white">Profile Access — {groups.find((g) => g.id === profileAccessGroupId)?.name}</h2>
+		<div class="max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-gray-700 bg-gray-900 p-6" onclick={(e) => e.stopPropagation()} onkeydown={() => {}}>
+			<h2 class="mb-4 text-lg font-medium text-white">Profile Access & Permissions — {groups.find((g) => g.id === profileAccessGroupId)?.name}</h2>
+			<div class="mb-3 text-xs text-gray-500">
+				<span class="inline-block w-16">View</span>
+				<span class="inline-block w-16">Export</span>
+				<span class="inline-block w-16">Timelapse</span>
+				<span class="inline-block w-16">Manage</span>
+			</div>
 			{#each streams as stream (stream.id)}
 				<div class="mb-3">
 					<h3 class="mb-1 text-sm font-medium text-gray-300">{stream.name}</h3>
 					{#if profileMap[stream.id]?.length}
 						{#each profileMap[stream.id] as profile (profile.id)}
-							<label class="flex items-center gap-2 py-0.5 text-sm text-gray-400 cursor-pointer">
-								<input type="checkbox" checked={selectedProfileIds.has(profile.id)}
+							{@const pp = profilePerms.get(profile.id)}
+							<div class="flex items-center gap-2 py-1 text-sm text-gray-400">
+								<input type="checkbox" checked={profilePerms.has(profile.id)}
 									onchange={() => toggleProfile(profile.id)}
 									class="rounded border-gray-600 bg-gray-800 text-blue-500" />
-								{profile.name}
-							</label>
+								<span class="w-32 truncate">{profile.name}</span>
+								{#if pp}
+									<label class="flex items-center gap-1 w-16">
+										<input type="checkbox" checked={pp.can_view} onchange={() => togglePerm(profile.id, 'can_view')} class="h-3 w-3 rounded border-gray-600 bg-gray-800 text-green-500" />
+										<span class="text-xs">View</span>
+									</label>
+									<label class="flex items-center gap-1 w-16">
+										<input type="checkbox" checked={pp.can_export} onchange={() => togglePerm(profile.id, 'can_export')} class="h-3 w-3 rounded border-gray-600 bg-gray-800 text-yellow-500" />
+										<span class="text-xs">Export</span>
+									</label>
+									<label class="flex items-center gap-1 w-16">
+										<input type="checkbox" checked={pp.can_timelapse} onchange={() => togglePerm(profile.id, 'can_timelapse')} class="h-3 w-3 rounded border-gray-600 bg-gray-800 text-cyan-500" />
+										<span class="text-xs">TL</span>
+									</label>
+									<label class="flex items-center gap-1 w-16">
+										<input type="checkbox" checked={pp.can_manage} onchange={() => togglePerm(profile.id, 'can_manage')} class="h-3 w-3 rounded border-gray-600 bg-gray-800 text-purple-500" />
+										<span class="text-xs">Manage</span>
+									</label>
+								{/if}
+							</div>
 						{/each}
 					{:else}
 						<p class="text-xs text-gray-500">No profiles</p>

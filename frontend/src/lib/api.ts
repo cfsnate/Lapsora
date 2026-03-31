@@ -1,4 +1,4 @@
-import type { Stream, StreamCreate, StreamUpdate, Profile, ProfileCreate, ProfileUpdate, ProfileTemplate, ProfileTemplateCreate, Capture, Timelapse, TimelapseGenerate, TimelapseSchedule, TimelapseScheduleCreate, TimelapseScheduleUpdate, CleanupSchedule, CleanupScheduleCreate, CleanupScheduleUpdate, TestResult, StorageStats, Notification, NotificationURL, HealthConfig, NotificationEventsConfig, LocationConfig, CaptureGapConfig, TimeFormatConfig, StatsSummary, StorageTrendPoint, CaptureActivityPoint, ProfileStoragePoint, Go2rtcConfig, Go2rtcStreamInfo, TimelapseSummary, RecordingStatus, RecordingStorageStats, RecordingRetentionConfig, PlaybackAvailabilityRange, ClipExport, ClipExportCreate, SetupStatus, SetupCreate, AuthUser, LoginCredentials, OIDCConfig, OIDCConfigUpdate, UserAdminRead, UserCreate, UserUpdate, UserProfileAccessUpdate, SelfUpdate, GroupRead, GroupCreate, GroupUpdate, TLSConfig, TLSConfigUpdate, TLSCertificateInfo } from './types';
+import type { Stream, StreamCreate, StreamUpdate, Profile, ProfileCreate, ProfileUpdate, ProfileTemplate, ProfileTemplateCreate, Capture, Timelapse, TimelapseGenerate, TimelapseSchedule, TimelapseScheduleCreate, TimelapseScheduleUpdate, CleanupSchedule, CleanupScheduleCreate, CleanupScheduleUpdate, TestResult, StorageStats, Notification, NotificationURL, HealthConfig, NotificationEventsConfig, LocationConfig, CaptureGapConfig, TimeFormatConfig, StatsSummary, StorageTrendPoint, CaptureActivityPoint, ProfileStoragePoint, Go2rtcConfig, Go2rtcStreamInfo, TimelapseSummary, RecordingStatus, RecordingStorageStats, RecordingRetentionConfig, PlaybackAvailabilityRange, ClipExport, ClipExportCreate, SetupStatus, SetupCreate, AuthUser, LoginCredentials, OIDCConfig, OIDCConfigUpdate, UserAdminRead, UserCreate, UserUpdate, UserProfileAccessUpdate, UserGroupMembershipUpdate, ProfilePermission, SelfUpdate, GroupRead, GroupCreate, GroupUpdate, TLSConfig, TLSConfigUpdate, TLSCertificateInfo } from './types';
 
 const BASE = '/api';
 
@@ -209,8 +209,10 @@ export const api = {
 	getUser: (id: number) => request<UserAdminRead>(`/auth/users/${id}`),
 	updateUser: (id: number, data: UserUpdate) => request<UserAdminRead>(`/auth/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
 	disableUser: (id: number) => request<UserAdminRead>(`/auth/users/${id}`, { method: 'DELETE' }),
-	getUserProfiles: (id: number) => request<{ profile_ids: number[]; user_id: number }>(`/auth/users/${id}/profiles`),
-	setUserProfiles: (id: number, data: UserProfileAccessUpdate) => request<{ profile_ids: number[]; user_id: number }>(`/auth/users/${id}/profiles`, { method: 'PUT', body: JSON.stringify(data) }),
+	getUserProfiles: (id: number) => request<{ profile_ids: number[]; profile_permissions: ProfilePermission[] }>(`/auth/users/${id}/profiles`),
+	setUserProfiles: (id: number, data: UserProfileAccessUpdate) => request<{ profile_ids: number[]; profile_permissions: ProfilePermission[] }>(`/auth/users/${id}/profiles`, { method: 'PUT', body: JSON.stringify(data) }),
+	getUserGroups: (id: number) => request<{ group_ids: number[] }>(`/auth/users/${id}/groups`),
+	setUserGroups: (id: number, data: UserGroupMembershipUpdate) => request<{ group_ids: number[] }>(`/auth/users/${id}/groups`, { method: 'PUT', body: JSON.stringify(data) }),
 
 	// Self-service account update
 	updateMe: (data: SelfUpdate) => request<AuthUser>('/auth/me', { method: 'PUT', body: JSON.stringify(data) }),

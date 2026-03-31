@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { api } from '$lib/api';
-	import type { UserAdminRead, UserCreate, UserUpdate, Stream, Profile } from '$lib/types';
+	import type { UserAdminRead, UserCreate, UserUpdate, Stream, Profile, ProfilePermission, GroupRead } from '$lib/types';
 
 	// ── State ────────────────────────────────────────────────────────────────
 	let loading = $state(true);
@@ -26,9 +26,16 @@
 
 	// Profile access modal
 	let profileAccessUserId = $state<number | null>(null);
-	let selectedProfileIds = $state<Set<number>>(new Set());
+	let profilePerms = $state<Map<number, ProfilePermission>>(new Map());
 	let savingProfiles = $state(false);
 	let profilesError = $state<string | null>(null);
+
+	// Group membership modal
+	let groupMembershipUserId = $state<number | null>(null);
+	let allGroups = $state<GroupRead[]>([]);
+	let selectedGroupIds = $state<Set<number>>(new Set());
+	let savingGroups = $state(false);
+	let groupsError = $state<string | null>(null);
 
 	// General action feedback
 	let actionMessage = $state<string | null>(null);
@@ -43,13 +50,14 @@
 					return;
 				}
 				currentUserId = me.id;
-				return Promise.all([api.getUsers(), api.getStreams()]);
+				return Promise.all([api.getUsers(), api.getStreams(), api.getGroups()]);
 			})
 			.then((results) => {
 				if (!results) return;
-				const [fetchedUsers, fetchedStreams] = results;
+				const [fetchedUsers, fetchedStreams, fetchedGroups] = results;
 				users = fetchedUsers;
 				streams = fetchedStreams;
+				allGroups = fetchedGroups;
 				// Load profiles for all streams
 				return Promise.all(fetchedStreams.map((s) => api.getStreamProfiles(s.id).then((profiles) => ({ streamId: s.id, profiles }))));
 			})
@@ -198,7 +206,11 @@
 		profilesError = null;
 		try {
 			const result = await api.getUserProfiles(user.id);
-			selectedProfileIds = new Set(result.profile_ids);
+			const map = new Map<number, ProfilePermission>();
+			for (const pp of result.profile_permissions) {
+				map.set(pp.profile_id, pp);
+			}
+			profilePerms = map;
 		} catch {
 			profilesError = 'Failed to load profile access.';
 		}
@@ -206,18 +218,27 @@
 
 	function closeProfileAccess() {
 		profileAccessUserId = null;
-		selectedProfileIds = new Set();
+		profilePerms = new Map();
 		profilesError = null;
 	}
 
 	function toggleProfile(profileId: number) {
-		const next = new Set(selectedProfileIds);
+		const next = new Map(profilePerms);
 		if (next.has(profileId)) {
 			next.delete(profileId);
 		} else {
-			next.add(profileId);
+			next.set(profileId, { profile_id: profileId, can_view: true, can_export: false, can_timelapse: false, can_manage: false });
 		}
-		selectedProfileIds = next;
+		profilePerms = next;
+	}
+
+	function togglePerm(profileId: number, perm: keyof ProfilePermission) {
+		if (perm === 'profile_id') return;
+		const pp = profilePerms.get(profileId);
+		if (!pp) return;
+		const next = new Map(profilePerms);
+		next.set(profileId, { ...pp, [perm]: !pp[perm] });
+		profilePerms = next;
 	}
 
 	async function saveProfileAccess() {
@@ -225,7 +246,10 @@
 		savingProfiles = true;
 		profilesError = null;
 		try {
-			await api.setUserProfiles(profileAccessUserId, { profile_ids: [...selectedProfileIds] });
+			await api.setUserProfiles(profileAccessUserId, {
+				profile_ids: [],
+				profile_permissions: [...profilePerms.values()],
+			});
 			await refreshUsers();
 			closeProfileAccess();
 			flashSuccess('Profile access updated.');
@@ -239,6 +263,50 @@
 	// ── Derived helpers ───────────────────────────────────────────────────────
 	function profileAccessUser(): UserAdminRead | undefined {
 		return users.find((u) => u.id === profileAccessUserId);
+	}
+
+	// ── Group membership ──────────────────────────────────────────────────────
+	async function openGroupMembership(user: UserAdminRead) {
+		groupMembershipUserId = user.id;
+		groupsError = null;
+		try {
+			const result = await api.getUserGroups(user.id);
+			selectedGroupIds = new Set(result.group_ids);
+		} catch {
+			groupsError = 'Failed to load group membership.';
+		}
+	}
+
+	function closeGroupMembership() {
+		groupMembershipUserId = null;
+		selectedGroupIds = new Set();
+		groupsError = null;
+	}
+
+	function toggleGroup(groupId: number) {
+		const next = new Set(selectedGroupIds);
+		if (next.has(groupId)) next.delete(groupId); else next.add(groupId);
+		selectedGroupIds = next;
+	}
+
+	async function saveGroupMembership() {
+		if (groupMembershipUserId === null) return;
+		savingGroups = true;
+		groupsError = null;
+		try {
+			await api.setUserGroups(groupMembershipUserId, { group_ids: [...selectedGroupIds] });
+			await refreshUsers();
+			closeGroupMembership();
+			flashSuccess('Group membership updated.');
+		} catch {
+			groupsError = 'Failed to save group membership.';
+		} finally {
+			savingGroups = false;
+		}
+	}
+
+	function groupMembershipUser(): UserAdminRead | undefined {
+		return users.find((u) => u.id === groupMembershipUserId);
 	}
 </script>
 
@@ -478,6 +546,12 @@
 											>
 												Profiles
 											</button>
+											<button
+												onclick={() => openGroupMembership(user)}
+												class="rounded-lg bg-cyan-700 hover:bg-cyan-600 px-3 py-1.5 text-xs font-medium text-white transition-colors"
+											>
+												Groups
+											</button>
 										{/if}
 									</div>
 								</td>
@@ -493,10 +567,10 @@
 <!-- Profile Access Modal -->
 {#if profileAccessUserId !== null}
 	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-		<div class="w-full max-w-lg mx-4 bg-gray-900 rounded-xl border border-gray-800 shadow-2xl">
+		<div class="w-full max-w-2xl mx-4 bg-gray-900 rounded-xl border border-gray-800 shadow-2xl">
 			<div class="flex items-center justify-between p-6 border-b border-gray-800">
 				<div>
-					<h2 class="text-lg font-semibold text-white">Profile Access</h2>
+					<h2 class="text-lg font-semibold text-white">Profile Access & Permissions</h2>
 					{#if profileAccessUser()}
 						<p class="text-sm text-gray-400 mt-0.5">{profileAccessUser()!.display_name} (@{profileAccessUser()!.username})</p>
 					{/if}
@@ -520,6 +594,12 @@
 				{#if streams.length === 0 || allProfiles().length === 0}
 					<p class="text-gray-400 text-sm">No streams or profiles configured.</p>
 				{:else}
+					<div class="mb-3 text-xs text-gray-500">
+						<span class="inline-block w-16">View</span>
+						<span class="inline-block w-16">Export</span>
+						<span class="inline-block w-16">Timelapse</span>
+						<span class="inline-block w-16">Manage</span>
+					</div>
 					<div class="space-y-4">
 						{#each streams as stream (stream.id)}
 							{#if profileMap[stream.id]?.length}
@@ -527,15 +607,34 @@
 									<h3 class="text-sm font-medium text-gray-300 mb-2">{stream.name}</h3>
 									<div class="space-y-2 pl-2">
 										{#each profileMap[stream.id] as profile (profile.id)}
-											<label class="flex items-center gap-3 cursor-pointer group">
+											{@const pp = profilePerms.get(profile.id)}
+											<div class="flex items-center gap-2">
 												<input
 													type="checkbox"
-													checked={selectedProfileIds.has(profile.id)}
+													checked={profilePerms.has(profile.id)}
 													onchange={() => toggleProfile(profile.id)}
 													class="h-4 w-4 rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500"
 												/>
-												<span class="text-sm text-gray-300 group-hover:text-white transition-colors">{profile.name}</span>
-											</label>
+												<span class="text-sm text-gray-300 w-32 truncate">{profile.name}</span>
+												{#if pp}
+													<label class="flex items-center gap-1 w-16">
+														<input type="checkbox" checked={pp.can_view} onchange={() => togglePerm(profile.id, 'can_view')} class="h-3 w-3 rounded border-gray-600 bg-gray-800 text-green-500" />
+														<span class="text-xs text-gray-500">View</span>
+													</label>
+													<label class="flex items-center gap-1 w-16">
+														<input type="checkbox" checked={pp.can_export} onchange={() => togglePerm(profile.id, 'can_export')} class="h-3 w-3 rounded border-gray-600 bg-gray-800 text-yellow-500" />
+														<span class="text-xs text-gray-500">Export</span>
+													</label>
+													<label class="flex items-center gap-1 w-16">
+														<input type="checkbox" checked={pp.can_timelapse} onchange={() => togglePerm(profile.id, 'can_timelapse')} class="h-3 w-3 rounded border-gray-600 bg-gray-800 text-cyan-500" />
+														<span class="text-xs text-gray-500">TL</span>
+													</label>
+													<label class="flex items-center gap-1 w-16">
+														<input type="checkbox" checked={pp.can_manage} onchange={() => togglePerm(profile.id, 'can_manage')} class="h-3 w-3 rounded border-gray-600 bg-gray-800 text-purple-500" />
+														<span class="text-xs text-gray-500">Manage</span>
+													</label>
+												{/if}
+											</div>
 										{/each}
 									</div>
 								</div>
@@ -558,6 +657,64 @@
 					class="rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-4 py-2 text-sm font-medium text-white transition-colors"
 				>
 					{savingProfiles ? 'Saving…' : 'Save Access'}
+				</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Group Membership Modal -->
+{#if groupMembershipUserId !== null}
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+		<div class="w-full max-w-md mx-4 bg-gray-900 rounded-xl border border-gray-800 shadow-2xl">
+			<div class="flex items-center justify-between p-6 border-b border-gray-800">
+				<div>
+					<h2 class="text-lg font-semibold text-white">Group Membership</h2>
+					{#if groupMembershipUser()}
+						<p class="text-sm text-gray-400 mt-0.5">{groupMembershipUser()!.display_name} (@{groupMembershipUser()!.username})</p>
+					{/if}
+				</div>
+				<button onclick={closeGroupMembership} class="text-gray-400 hover:text-white transition-colors" aria-label="Close">
+					<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+					</svg>
+				</button>
+			</div>
+
+			<div class="p-6 max-h-96 overflow-y-auto">
+				{#if groupsError}
+					<div class="mb-4 rounded-lg bg-red-900/40 border border-red-700 px-4 py-3 text-red-300 text-sm">{groupsError}</div>
+				{/if}
+
+				{#if allGroups.length === 0}
+					<p class="text-gray-400 text-sm">No groups configured. Create groups in the Groups management page.</p>
+				{:else}
+					<div class="space-y-2">
+						{#each allGroups as group (group.id)}
+							<label class="flex items-center gap-3 rounded-lg border border-gray-800 bg-gray-800/50 p-3 cursor-pointer group">
+								<input
+									type="checkbox"
+									checked={selectedGroupIds.has(group.id)}
+									onchange={() => toggleGroup(group.id)}
+									class="h-4 w-4 rounded border-gray-600 bg-gray-800 text-cyan-500 focus:ring-cyan-500"
+								/>
+								<div>
+									<span class="text-sm text-gray-300 group-hover:text-white transition-colors">{group.name}</span>
+									<span class="ml-2 text-xs {group.role === 'admin' ? 'text-purple-400' : 'text-gray-500'}">{group.role}</span>
+									<span class="ml-2 text-xs text-gray-500">{group.profile_ids.length} profile{group.profile_ids.length !== 1 ? 's' : ''}</span>
+								</div>
+							</label>
+						{/each}
+					</div>
+				{/if}
+			</div>
+
+			<div class="flex justify-end gap-3 p-6 border-t border-gray-800">
+				<button onclick={closeGroupMembership} class="rounded-lg bg-gray-700 hover:bg-gray-600 px-4 py-2 text-sm font-medium text-gray-200 transition-colors">
+					Cancel
+				</button>
+				<button onclick={saveGroupMembership} disabled={savingGroups} class="rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-4 py-2 text-sm font-medium text-white transition-colors">
+					{savingGroups ? 'Saving…' : 'Save Membership'}
 				</button>
 			</div>
 		</div>
