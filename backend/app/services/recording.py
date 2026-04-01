@@ -193,10 +193,7 @@ class RecordingProcess:
             "-rtsp_transport", "tcp",
             "-rtsp_flags", "prefer_tcp",
             "-use_wallclock_as_timestamps", "1",
-            "-timeout", "30000000",       # 30s network timeout (microseconds)
-            "-reconnect", "1",
-            "-reconnect_streamed", "1",
-            "-reconnect_delay_max", "30",  # max 30s between reconnect attempts
+            "-stimeout", "30000000",      # 30s RTSP socket I/O timeout (microseconds)
             "-i", self.rtsp_url,
             "-c", "copy",
             "-f", "segment",
