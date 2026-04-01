@@ -1,14 +1,16 @@
 """Admin-only TLS / ACME certificate management endpoints."""
 
 import logging
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies import require_admin
 from app.schemas import TLSAcquireRequest, TLSCertificateInfo, TLSConfigRead, TLSConfigUpdate
 from app.services.tls import (
+    _get_cert_dir,
     acquire_certificate,
     get_certificate_info,
     get_tls_settings,
@@ -60,6 +62,45 @@ def put_tls_config(body: TLSConfigUpdate, db: Session = Depends(get_db)):
         enabled=bool(cfg.get("enabled")),
         has_certificate=cert_info is not None,
     )
+
+
+@router.post("/ca-bundle")
+async def upload_ca_bundle(file: UploadFile, db: Session = Depends(get_db)):
+    """Upload a CA bundle PEM file for internal ACME servers.
+
+    Validates the file looks like a PEM certificate, saves it to the certs
+    directory, and stores the path in the settings table.
+    """
+    contents = await file.read()
+    if len(contents) > 1_000_000:
+        raise HTTPException(status_code=400, detail="File too large (max 1MB).")
+
+    # Basic PEM validation
+    text = contents.decode("utf-8", errors="replace")
+    if "-----BEGIN CERTIFICATE-----" not in text:
+        raise HTTPException(status_code=400, detail="File does not appear to be a PEM certificate bundle.")
+
+    cert_dir = _get_cert_dir()
+    ca_bundle_path = cert_dir / "acme-ca-bundle.pem"
+    ca_bundle_path.write_bytes(contents)
+    logger.info("Saved uploaded CA bundle to %s", ca_bundle_path)
+
+    update_tls_settings(db, acme_ca_bundle=str(ca_bundle_path))
+
+    return {"success": True, "path": str(ca_bundle_path), "message": "CA bundle uploaded."}
+
+
+@router.delete("/ca-bundle")
+def delete_ca_bundle(db: Session = Depends(get_db)):
+    """Remove the uploaded CA bundle and clear the setting."""
+    cert_dir = _get_cert_dir()
+    ca_bundle_path = cert_dir / "acme-ca-bundle.pem"
+    if ca_bundle_path.exists():
+        ca_bundle_path.unlink()
+        logger.info("Deleted CA bundle at %s", ca_bundle_path)
+
+    update_tls_settings(db, acme_ca_bundle="")
+    return {"success": True, "message": "CA bundle removed."}
 
 
 @router.post("/acquire")

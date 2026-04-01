@@ -797,15 +797,58 @@
 						<p class="mt-1 text-xs text-gray-500">Default is Let's Encrypt production. Use a custom ACME CA if needed.</p>
 					</div>
 					<div>
-						<label for="tls-ca-bundle" class="mb-1 block text-sm font-medium text-gray-300">CA Bundle Path <span class="text-gray-500">(optional)</span></label>
-						<input
-							id="tls-ca-bundle"
-							type="text"
-							bind:value={tlsForm.acme_ca_bundle}
-							placeholder="/etc/ssl/certs/internal-ca.pem"
-							class="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-						/>
-						<p class="mt-1 text-xs text-gray-500">Path to a CA bundle PEM file on the server. Required for internal ACME servers with self-signed or private CA certificates.</p>
+						<label class="mb-1 block text-sm font-medium text-gray-300">CA Bundle <span class="text-gray-500">(optional)</span></label>
+						{#if tlsForm.acme_ca_bundle}
+							<div class="flex items-center gap-2 rounded-md border border-gray-600 bg-gray-800 px-3 py-2">
+								<svg class="h-4 w-4 flex-shrink-0 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+								</svg>
+								<span class="flex-1 truncate text-sm text-gray-300" title={tlsForm.acme_ca_bundle}>{tlsForm.acme_ca_bundle.split('/').pop()}</span>
+								<button
+									type="button"
+									onclick={async () => {
+										try {
+											await api.deleteCaBundle();
+											tlsForm.acme_ca_bundle = '';
+											tlsSaveResult = { ok: true, message: 'CA bundle removed.' };
+										} catch (err) {
+											tlsSaveResult = { ok: false, message: err instanceof Error ? err.message : 'Failed to remove CA bundle.' };
+										}
+									}}
+									class="rounded px-2 py-1 text-xs text-red-400 hover:bg-gray-700 hover:text-red-300"
+								>
+									Remove
+								</button>
+							</div>
+						{:else}
+							<label
+								class="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-gray-600 bg-gray-800 px-3 py-3 text-sm text-gray-400 transition-colors hover:border-gray-500 hover:text-gray-300"
+							>
+								<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+								</svg>
+								Upload CA Bundle (.pem)
+								<input
+									type="file"
+									accept=".pem,.crt,.cer"
+									class="hidden"
+									onchange={async (e) => {
+										const target = e.currentTarget as HTMLInputElement;
+										const file = target.files?.[0];
+										if (!file) return;
+										try {
+											const result = await api.uploadCaBundle(file);
+											tlsForm.acme_ca_bundle = result.path;
+											tlsSaveResult = { ok: true, message: 'CA bundle uploaded.' };
+										} catch (err) {
+											tlsSaveResult = { ok: false, message: err instanceof Error ? err.message : 'Failed to upload CA bundle.' };
+										}
+										target.value = '';
+									}}
+								/>
+							</label>
+						{/if}
+						<p class="mt-1 text-xs text-gray-500">PEM certificate bundle for internal ACME servers with self-signed or private CA certificates.</p>
 					</div>
 					{#if tlsSaveResult}
 						<p class="text-sm {tlsSaveResult.ok ? 'text-green-400' : 'text-red-400'}">{tlsSaveResult.message}</p>

@@ -213,6 +213,60 @@ def test_tls_config_ca_bundle_round_trip(client: TestClient):
     assert resp3.json()["acme_ca_bundle"] == ""
 
 
+CA_BUNDLE_URL = "/api/tls/ca-bundle"
+
+DUMMY_PEM = b"""-----BEGIN CERTIFICATE-----
+MIIBkTCB+wIUYz1234567890abcdefghijklmnopqrst=
+-----END CERTIFICATE-----
+"""
+
+
+def test_upload_ca_bundle(client: TestClient, tmp_path):
+    """POST /api/tls/ca-bundle saves the file and updates the setting."""
+    _admin_login(client)
+    with patch("app.routers.tls._get_cert_dir", return_value=tmp_path):
+        resp = client.post(CA_BUNDLE_URL, files={"file": ("ca.pem", DUMMY_PEM, "application/x-pem-file")})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["success"] is True
+    assert "acme-ca-bundle.pem" in data["path"]
+    # File should exist on disk
+    assert (tmp_path / "acme-ca-bundle.pem").exists()
+    assert (tmp_path / "acme-ca-bundle.pem").read_bytes() == DUMMY_PEM
+
+    # Config should reflect the path
+    resp2 = client.get(CONFIG_URL)
+    assert resp2.json()["acme_ca_bundle"] == data["path"]
+
+
+def test_upload_ca_bundle_rejects_non_pem(client: TestClient, tmp_path):
+    """POST /api/tls/ca-bundle rejects files without PEM markers."""
+    _admin_login(client)
+    with patch("app.routers.tls._get_cert_dir", return_value=tmp_path):
+        resp = client.post(CA_BUNDLE_URL, files={"file": ("bad.txt", b"not a certificate", "text/plain")})
+    assert resp.status_code == 400
+    assert "PEM" in resp.json()["detail"]
+
+
+def test_delete_ca_bundle(client: TestClient, tmp_path):
+    """DELETE /api/tls/ca-bundle removes the file and clears the setting."""
+    _admin_login(client)
+    # Upload first
+    with patch("app.routers.tls._get_cert_dir", return_value=tmp_path):
+        client.post(CA_BUNDLE_URL, files={"file": ("ca.pem", DUMMY_PEM, "application/x-pem-file")})
+        assert (tmp_path / "acme-ca-bundle.pem").exists()
+
+        # Delete
+        resp = client.delete(CA_BUNDLE_URL)
+    assert resp.status_code == 200
+    assert resp.json()["success"] is True
+    assert not (tmp_path / "acme-ca-bundle.pem").exists()
+
+    # Config should be cleared
+    resp2 = client.get(CONFIG_URL)
+    assert resp2.json()["acme_ca_bundle"] == ""
+
+
 # ---------------------------------------------------------------------------
 # Acquire endpoint
 # ---------------------------------------------------------------------------

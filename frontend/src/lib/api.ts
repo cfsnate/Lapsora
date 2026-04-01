@@ -228,6 +228,14 @@ export const api = {
 	saveTLSConfig: (data: TLSConfigUpdate) => request<TLSConfig>('/tls/config', { method: 'PUT', body: JSON.stringify(data) }),
 	acquireCertificate: (force = false) => request<{ success: boolean; message: string }>('/tls/acquire', { method: 'POST', body: JSON.stringify({ force }) }),
 	getCertificateInfo: () => request<TLSCertificateInfo>('/tls/certificate'),
+	uploadCaBundle: async (file: File): Promise<{ success: boolean; path: string; message: string }> => {
+		const form = new FormData();
+		form.append('file', file);
+		const res = await fetch(`${BASE}/tls/ca-bundle`, { method: 'POST', body: form, credentials: 'include' as RequestCredentials });
+		if (!res.ok) { const text = await res.text().catch(() => ''); throw new Error(`API error ${res.status}: ${text}`); }
+		return res.json();
+	},
+	deleteCaBundle: () => request<{ success: boolean; message: string }>('/tls/ca-bundle', { method: 'DELETE' }),
 
 	// Admin console (FFmpeg logs)
 	getConsoleProfiles: () => request<{ profile_ids: number[] }>('/recording/console/profiles'),
