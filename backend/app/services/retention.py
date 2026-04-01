@@ -103,16 +103,17 @@ async def run_profile_cleanup(
 
         logger.info("Profile cleanup complete: %s", summary)
 
-        # Emit retention summary event
+        # Emit retention summary event (only when something was actually cleaned)
         try:
             from app.services.events import emit
-            await emit(
-                "retention_summary",
-                "Cleanup complete",
-                f"Profile {profile_id}: deleted {summary['captures_deleted']} captures, "
-                f"{summary['timelapses_deleted']} timelapses. "
-                f"Cleaned {summary['orphan_records_cleaned']} orphan records.",
-            )
+            if summary['captures_deleted'] > 0 or summary['timelapses_deleted'] > 0 or summary['orphan_records_cleaned'] > 0:
+                await emit(
+                    "retention_summary",
+                    "Cleanup complete",
+                    f"Profile {profile_id}: deleted {summary['captures_deleted']} captures, "
+                    f"{summary['timelapses_deleted']} timelapses. "
+                    f"Cleaned {summary['orphan_records_cleaned']} orphan records.",
+                )
         except Exception:
             pass
 
@@ -237,12 +238,13 @@ async def run_recording_cleanup(profile_id: int, retention_days: int) -> dict:
         try:
             from app.services.events import emit
 
-            await emit(
-                "recording_retention_summary",
-                "Recording cleanup complete",
-                f"Profile {profile_id}: deleted {summary['segments_deleted']} segments. "
-                f"Cleaned {summary['orphan_records_cleaned']} orphan records.",
-            )
+            if summary["segments_deleted"] > 0 or summary["orphan_records_cleaned"] > 0:
+                await emit(
+                    "recording_retention_summary",
+                    "Recording cleanup complete",
+                    f"Profile {profile_id}: deleted {summary['segments_deleted']} segments. "
+                    f"Cleaned {summary['orphan_records_cleaned']} orphan records.",
+                )
         except Exception:
             pass
 
