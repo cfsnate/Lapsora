@@ -237,7 +237,9 @@ def acquire_certificate(domain: str, db) -> bool:
                     return False
 
     # Poll and finalize
-    deadline = datetime.now(UTC) + timedelta(seconds=90)
+    # acme-python's poll_authorizations compares deadline against datetime.now()
+    # (naive), so the deadline must also be naive to avoid a TypeError.
+    deadline = datetime.utcnow() + timedelta(seconds=90)
     try:
         order = acme_client.poll_and_finalize(order, deadline=deadline)
     except Exception:
