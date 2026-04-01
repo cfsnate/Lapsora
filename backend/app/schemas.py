@@ -71,6 +71,7 @@ class ProfileCreate(BaseModel):
     recording_sun_events: str = ""
     segment_duration_seconds: int = Field(default=300, ge=30, le=3600)
     recording_storage_path: str | None = None
+    recording_audio_enabled: bool = False
     recording_days: str = ""
     recording_retention_days: int | None = None
 
@@ -97,6 +98,7 @@ class ProfileUpdate(BaseModel):
     recording_sun_events: str | None = None
     segment_duration_seconds: int | None = None
     recording_storage_path: str | None = None
+    recording_audio_enabled: bool | None = None
     recording_days: str | None = None
     recording_retention_days: int | None = None
 
@@ -128,6 +130,7 @@ class ProfileRead(BaseModel):
     recording_sun_events: str
     segment_duration_seconds: int
     recording_storage_path: str | None
+    recording_audio_enabled: bool
     recording_days: str
     recording_retention_days: int | None
     source_template_id: int | None = None

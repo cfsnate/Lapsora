@@ -58,6 +58,7 @@ export interface Profile {
 	recording_sun_events: string;
 	segment_duration_seconds: number;
 	recording_storage_path: string | null;
+	recording_audio_enabled: boolean;
 	recording_days: string;
 	recording_retention_days: number | null;
 	source_template_id: number | null;
@@ -124,6 +125,7 @@ export interface ProfileCreate {
 	recording_sun_events?: string;
 	segment_duration_seconds?: number;
 	recording_storage_path?: string | null;
+	recording_audio_enabled?: boolean;
 	recording_days?: string;
 }
 
@@ -149,6 +151,7 @@ export interface ProfileUpdate {
 	recording_sun_events?: string;
 	segment_duration_seconds?: number;
 	recording_storage_path?: string | null;
+	recording_audio_enabled?: boolean;
 	recording_days?: string;
 }
 

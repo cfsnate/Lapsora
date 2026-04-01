@@ -221,12 +221,13 @@ def _is_within_recording_window(profile: Profile, db, now: datetime) -> bool:
 class RecordingProcess:
     """Manages a single FFmpeg recording subprocess for one profile."""
 
-    def __init__(self, profile_id: int, stream_id: int, rtsp_url: str, output_dir: str, segment_duration: int):
+    def __init__(self, profile_id: int, stream_id: int, rtsp_url: str, output_dir: str, segment_duration: int, audio_enabled: bool = False):
         self.profile_id = profile_id
         self.stream_id = stream_id
         self.rtsp_url = rtsp_url
         self.output_dir = output_dir
         self.segment_duration = segment_duration
+        self.audio_enabled = audio_enabled
         self.process: asyncio.subprocess.Process | None = None
         self.state: str = "stopped"
         self.started_at: datetime | None = None
@@ -239,7 +240,7 @@ class RecordingProcess:
     def _build_ffmpeg_args(self) -> list[str]:
         os.makedirs(self.output_dir, exist_ok=True)
         pattern = os.path.join(self.output_dir, "%Y%m%d_%H%M%S.ts")
-        return [
+        args = [
             "ffmpeg",
             "-hide_banner",
             "-loglevel", "warning",
@@ -249,13 +250,18 @@ class RecordingProcess:
             "-stimeout", "30000000",      # 30s RTSP socket I/O timeout (microseconds)
             "-i", self.rtsp_url,
             "-c", "copy",
+        ]
+        if not self.audio_enabled:
+            args.append("-an")
+        args.extend([
             "-f", "segment",
             "-segment_time", str(self.segment_duration),
             "-segment_format", "mpegts",
             "-reset_timestamps", "1",
             "-strftime", "1",
             pattern,
-        ]
+        ])
+        return args
 
     async def _start_ffmpeg(self) -> None:
         args = self._build_ffmpeg_args()
@@ -467,6 +473,7 @@ class RecordingManager:
                 rtsp_url=rtsp_url,
                 output_dir=output_dir,
                 segment_duration=profile.segment_duration_seconds,
+                audio_enabled=profile.recording_audio_enabled,
             )
             self._processes[profile_id] = rp
             await rp._start_ffmpeg()

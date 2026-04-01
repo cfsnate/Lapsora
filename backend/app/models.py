@@ -79,6 +79,7 @@ class Profile(Base):
     segment_duration_seconds: Mapped[int] = mapped_column(Integer, default=300, server_default="300")
     recording_storage_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     recording_days: Mapped[str] = mapped_column(Text, default="", server_default="")
+    recording_audio_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     recording_retention_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
     source_template_id: Mapped[int | None] = mapped_column(
         ForeignKey("profile_templates.id", ondelete="SET NULL"), nullable=True

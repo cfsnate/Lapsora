@@ -56,6 +56,7 @@ let sun_events = $state<string[]>(
 
 	let recording_enabled = $state(profile?.recording_enabled ?? false);
 	let recording_mode = $state(profile?.recording_mode ?? 'always');
+	let recording_audio_enabled = $state(profile?.recording_audio_enabled ?? false);
 	let recording_start_time = $state(profile?.recording_start_time ?? '00:00');
 	let recording_end_time = $state(profile?.recording_end_time ?? '23:59');
 	let recording_sun_offset_minutes = $state(profile?.recording_sun_offset_minutes ?? 0);
@@ -83,6 +84,7 @@ let sun_events = $state<string[]>(
 		sun_events: capture_mode === 'sun' ? sun_events.join(',') : '',
 			recording_enabled,
 			recording_mode: recording_enabled ? recording_mode : 'always',
+			recording_audio_enabled: recording_enabled ? recording_audio_enabled : false,
 			recording_start_time: recording_enabled && recording_mode === 'scheduled' ? recording_start_time : null,
 			recording_end_time: recording_enabled && recording_mode === 'scheduled' ? recording_end_time : null,
 			recording_sun_offset_minutes: recording_enabled && recording_mode === 'sun' ? recording_sun_offset_minutes : 0,
@@ -283,6 +285,16 @@ let sun_events = $state<string[]>(
 		</div>
 
 		{#if recording_enabled}
+			<div class="mt-3 flex items-center gap-3">
+				<input
+					id="recording-audio"
+					type="checkbox"
+					bind:checked={recording_audio_enabled}
+					class="h-4 w-4 rounded border-gray-600 bg-gray-900 text-blue-500 focus:ring-blue-500"
+				/>
+				<label for="recording-audio" class="text-sm text-gray-300">Include audio</label>
+			</div>
+
 			<div class="mt-4">
 				<label class="mb-2 block text-sm font-medium text-gray-300">Recording schedule</label>
 				<div class="flex gap-4">
