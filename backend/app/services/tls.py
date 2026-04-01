@@ -198,6 +198,7 @@ def acquire_certificate(domain: str, db) -> bool:
     """
     cert_dir = _get_cert_dir()
 
+    logger.info("ACME step 1/5: Building ACME client...")
     try:
         acme_client = _get_acme_client(db)
     except Exception:
@@ -205,6 +206,7 @@ def acquire_certificate(domain: str, db) -> bool:
         return False
 
     # Generate a fresh domain key and CSR
+    logger.info("ACME step 2/5: Generating domain key and CSR for %s", domain)
     domain_key = _generate_domain_key()
     domain_key_pem = domain_key.private_bytes(
         encoding=serialization.Encoding.PEM,
@@ -213,6 +215,7 @@ def acquire_certificate(domain: str, db) -> bool:
     )
     csr_pem = make_csr(domain_key_pem, domains=[domain])
 
+    logger.info("ACME step 3/5: Creating order...")
     try:
         order = acme_client.new_order(csr_pem)
     except Exception:
@@ -220,6 +223,7 @@ def acquire_certificate(domain: str, db) -> bool:
         return False
 
     # Respond to HTTP-01 challenges
+    logger.info("ACME step 4/5: Answering HTTP-01 challenges...")
     token_values: list[str] = []
     for authz in order.authorizations:
         for challb in authz.body.challenges:
@@ -228,6 +232,11 @@ def acquire_certificate(domain: str, db) -> bool:
                 key_auth = challb.chall.key_authorization(acme_client.net.key)
                 _store_challenge(token, key_auth)
                 token_values.append(token)
+                logger.info(
+                    "ACME challenge ready: token=%s — verify the ACME server can reach "
+                    "http://%s/.well-known/acme-challenge/%s",
+                    token[:16] + "...", domain, token[:16] + "...",
+                )
                 try:
                     acme_client.answer_challenge(challb, challb.chall.response(acme_client.net.key))
                 except Exception:
@@ -239,11 +248,17 @@ def acquire_certificate(domain: str, db) -> bool:
     # Poll and finalize
     # acme-python's poll_authorizations compares deadline against datetime.now()
     # (naive), so the deadline must also be naive to avoid a TypeError.
+    logger.info("ACME step 5/5: Polling for authorization and finalizing (timeout: 90s)...")
     deadline = datetime.utcnow() + timedelta(seconds=90)
     try:
         order = acme_client.poll_and_finalize(order, deadline=deadline)
     except Exception:
-        logger.exception("ACME order finalization failed for %s", domain)
+        logger.exception(
+            "ACME order finalization failed for %s. This usually means the ACME server "
+            "could not reach http://%s/.well-known/acme-challenge/<token> on port 80. "
+            "Check that port 80 is forwarded to this application and not blocked by a firewall.",
+            domain, domain,
+        )
         for t in token_values:
             _remove_challenge(t)
         return False
