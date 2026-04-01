@@ -1,6 +1,7 @@
 """Recording engine — manages FFmpeg processes for continuous MPEG-TS recording."""
 
 import asyncio
+import collections
 import json
 import logging
 import os
@@ -21,6 +22,57 @@ logger = logging.getLogger(__name__)
 GO2RTC_DEFAULT_RTSP_PORT = 8554
 BACKOFF_SCHEDULE = [0, 5, 10, 30, 60]
 MIN_SEGMENT_SIZE = 1024
+
+# ---------------------------------------------------------------------------
+# Console log ring buffers + SSE
+# ---------------------------------------------------------------------------
+
+LOG_BUFFER_SIZE = 500
+
+# Per-profile ring buffer: profile_id -> deque of {"ts": iso, "line": str}
+_log_buffers: dict[int, collections.deque] = {}
+_log_buffers_lock = threading.Lock()
+
+# SSE queues for console log subscribers
+_console_sse_queues: list[asyncio.Queue] = []
+_console_sse_lock = threading.Lock()
+
+
+def _push_log_line(profile_id: int, line: str) -> None:
+    """Add a log line to the ring buffer and broadcast to SSE subscribers."""
+    entry = {
+        "profile_id": profile_id,
+        "ts": datetime.now(UTC).isoformat(),
+        "line": line,
+    }
+
+    with _log_buffers_lock:
+        if profile_id not in _log_buffers:
+            _log_buffers[profile_id] = collections.deque(maxlen=LOG_BUFFER_SIZE)
+        _log_buffers[profile_id].append(entry)
+
+    # Broadcast to SSE subscribers
+    sse_data = json.dumps(entry)
+    with _console_sse_lock:
+        queues = list(_console_sse_queues)
+    for q in queues:
+        try:
+            q.put_nowait(sse_data)
+        except asyncio.QueueFull:
+            pass
+
+
+def get_log_buffer(profile_id: int) -> list[dict]:
+    """Return buffered log lines for a profile."""
+    with _log_buffers_lock:
+        buf = _log_buffers.get(profile_id)
+        return list(buf) if buf else []
+
+
+def get_all_log_profiles() -> list[int]:
+    """Return profile IDs that have log buffers."""
+    with _log_buffers_lock:
+        return [pid for pid, buf in _log_buffers.items() if len(buf) > 0]
 
 
 def _slug(name: str) -> str:
@@ -182,6 +234,7 @@ class RecordingProcess:
         self.retry_count: int = 0
         self._watchdog_task: asyncio.Task | None = None
         self._wait_task: asyncio.Task | None = None
+        self._stderr_task: asyncio.Task | None = None
 
     def _build_ffmpeg_args(self) -> list[str]:
         os.makedirs(self.output_dir, exist_ok=True)
@@ -207,6 +260,7 @@ class RecordingProcess:
     async def _start_ffmpeg(self) -> None:
         args = self._build_ffmpeg_args()
         logger.info("Starting FFmpeg for profile %d with command: %s", self.profile_id, ' '.join(args))
+        _push_log_line(self.profile_id, f"[lapsora] Starting FFmpeg: {' '.join(args)}")
         
         self.process = await asyncio.create_subprocess_exec(
             *args,
@@ -217,6 +271,7 @@ class RecordingProcess:
         self.started_at = datetime.now(UTC)
         self._watchdog_task = asyncio.create_task(self._watchdog())
         self._wait_task = asyncio.create_task(self._wait_for_exit())
+        self._stderr_task = asyncio.create_task(self._read_stderr())
         
         # Emit recording started event
         profile_title = f"Profile {self.profile_id}"
@@ -245,6 +300,9 @@ class RecordingProcess:
         if self._wait_task is not None:
             self._wait_task.cancel()
             self._wait_task = None
+        if self._stderr_task is not None:
+            self._stderr_task.cancel()
+            self._stderr_task = None
         
         # Emit recording stopped event
         profile_title = f"Profile {self.profile_id}"
@@ -260,18 +318,34 @@ class RecordingProcess:
         
         await self._emit_status_event()
 
+    async def _read_stderr(self) -> None:
+        """Read FFmpeg stderr line-by-line into the console log ring buffer."""
+        try:
+            while self.process and self.process.stderr:
+                line_bytes = await self.process.stderr.readline()
+                if not line_bytes:
+                    break
+                line = line_bytes.decode("utf-8", errors="replace").rstrip()
+                if line:
+                    _push_log_line(self.profile_id, line)
+        except (asyncio.CancelledError, Exception):
+            pass
+
     async def _wait_for_exit(self) -> None:
         returncode = await self.process.wait()
-        # Read stderr to get error details
-        stderr_output = ""
-        if self.process.stderr:
+        # Wait for stderr reader to finish draining
+        if self._stderr_task and not self._stderr_task.done():
             try:
-                stderr_data = await self.process.stderr.read()
-                stderr_output = stderr_data.decode('utf-8', errors='replace').strip()
-            except Exception as e:
-                logger.warning("Failed to read FFmpeg stderr: %s", e)
-        
-        await self._on_process_exit(returncode, stderr_output)
+                await asyncio.wait_for(self._stderr_task, timeout=2)
+            except (asyncio.TimeoutError, asyncio.CancelledError):
+                pass
+
+        # Collect any remaining stderr from the buffer for the error notification
+        recent_lines = get_log_buffer(self.profile_id)
+        stderr_tail = "\n".join(e["line"] for e in recent_lines[-10:]) if recent_lines else ""
+
+        _push_log_line(self.profile_id, f"[lapsora] FFmpeg exited with code {returncode}")
+        await self._on_process_exit(returncode, stderr_tail)
 
     async def _on_process_exit(self, returncode: int, stderr_output: str = "") -> None:
         if self.state == "stopped":
