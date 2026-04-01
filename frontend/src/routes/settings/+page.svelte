@@ -644,6 +644,50 @@
 				<p class="mb-4 text-sm text-gray-400">
 					Configure an OpenID Connect provider to enable single sign-on. Users who log in via OIDC are auto-provisioned if they don't have an account.
 				</p>
+
+				<!-- IdP configuration helper -->
+				<div class="mb-5 rounded-lg border border-gray-700 bg-gray-800/60 p-4 space-y-3">
+					<h4 class="text-sm font-medium text-gray-300">Settings for your Identity Provider</h4>
+					<p class="text-xs text-gray-500">Copy these values into your Okta / Keycloak / Azure AD app registration.</p>
+					<div class="space-y-2">
+						<div>
+							<span class="text-xs font-medium text-gray-400">Sign-in redirect URI</span>
+							<div class="mt-0.5 flex items-center gap-2">
+								<code class="flex-1 truncate rounded bg-gray-900 px-2 py-1 text-xs text-blue-300 border border-gray-700">{window.location.origin}/api/auth/oidc/callback</code>
+								<button
+									type="button"
+									onclick={() => { navigator.clipboard.writeText(`${window.location.origin}/api/auth/oidc/callback`); }}
+									class="rounded px-2 py-1 text-xs text-gray-400 hover:bg-gray-700 hover:text-white"
+									title="Copy to clipboard"
+								>
+									<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+										<rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+									</svg>
+								</button>
+							</div>
+						</div>
+						<div>
+							<span class="text-xs font-medium text-gray-400">Sign-out redirect URI <span class="text-gray-600">(if required)</span></span>
+							<div class="mt-0.5 flex items-center gap-2">
+								<code class="flex-1 truncate rounded bg-gray-900 px-2 py-1 text-xs text-blue-300 border border-gray-700">{window.location.origin}/login</code>
+								<button
+									type="button"
+									onclick={() => { navigator.clipboard.writeText(`${window.location.origin}/login`); }}
+									class="rounded px-2 py-1 text-xs text-gray-400 hover:bg-gray-700 hover:text-white"
+									title="Copy to clipboard"
+								>
+									<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+										<rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+									</svg>
+								</button>
+							</div>
+						</div>
+						<div>
+							<span class="text-xs font-medium text-gray-400">Allowed grant types</span>
+							<p class="mt-0.5 text-xs text-gray-300">Authorization Code (with PKCE if no client secret)</p>
+						</div>
+					</div>
+				</div>
 				{#if oidcConfig?.enabled}
 					<div class="mb-4 rounded-lg border border-green-800 bg-green-900/20 px-3 py-2 text-sm text-green-300">
 						OIDC is currently <strong>enabled</strong> with provider "{oidcConfig.provider_name || oidcConfig.issuer_url}".
