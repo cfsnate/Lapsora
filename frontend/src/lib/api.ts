@@ -228,4 +228,9 @@ export const api = {
 	saveTLSConfig: (data: TLSConfigUpdate) => request<TLSConfig>('/tls/config', { method: 'PUT', body: JSON.stringify(data) }),
 	acquireCertificate: (force = false) => request<{ success: boolean; message: string }>('/tls/acquire', { method: 'POST', body: JSON.stringify({ force }) }),
 	getCertificateInfo: () => request<TLSCertificateInfo>('/tls/certificate'),
+
+	// Admin console (FFmpeg logs)
+	getConsoleProfiles: () => request<{ profile_ids: number[] }>('/recording/console/profiles'),
+	getProfileLogs: (profileId: number) => request<{ profile_id: number; lines: { profile_id: number; ts: string; line: string }[] }>(`/recording/${profileId}/logs`),
+	getConsoleStreamUrl: () => `${BASE}/recording/console/stream`,
 };

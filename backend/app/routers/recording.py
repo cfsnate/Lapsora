@@ -215,3 +215,59 @@ async def delete_all_recordings(current_user: User = Depends(require_admin), db:
         "segments_deleted": count,
         "bytes_freed": removed_bytes,
     }
+
+
+# ---------------------------------------------------------------------------
+# Admin FFmpeg console (live logs)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/console/profiles")
+def get_console_profiles(
+    _admin: User = Depends(require_admin),
+):
+    """List profile IDs that have log output available."""
+    from app.services.recording import get_all_log_profiles
+
+    return {"profile_ids": get_all_log_profiles()}
+
+
+@router.get("/{profile_id}/logs")
+def get_profile_logs(
+    profile_id: int,
+    _admin: User = Depends(require_admin),
+):
+    """Return buffered FFmpeg log lines for a profile (last 500 lines)."""
+    from app.services.recording import get_log_buffer
+
+    return {"profile_id": profile_id, "lines": get_log_buffer(profile_id)}
+
+
+@router.get("/console/stream")
+async def console_sse_stream(
+    _admin: User = Depends(require_admin),
+):
+    """SSE stream of live FFmpeg log lines from all profiles."""
+    import asyncio
+
+    from sse_starlette.sse import EventSourceResponse
+
+    from app.services.recording import _console_sse_lock, _console_sse_queues
+
+    queue: asyncio.Queue = asyncio.Queue(maxsize=200)
+    with _console_sse_lock:
+        _console_sse_queues.append(queue)
+
+    async def event_generator():
+        try:
+            while True:
+                data = await queue.get()
+                yield {"event": "console_log", "data": data}
+        except asyncio.CancelledError:
+            pass
+        finally:
+            with _console_sse_lock:
+                if queue in _console_sse_queues:
+                    _console_sse_queues.remove(queue)
+
+    return EventSourceResponse(event_generator())
