@@ -74,8 +74,11 @@ def generate_playlist(
             # In-progress segment: use elapsed time as provisional duration
             dur = max(1.0, (now - seg.start_time).total_seconds())
 
-        # Insert a discontinuity marker only when there's a real gap
-        if prev_end is not None and seg.start_time > prev_end + timedelta(seconds=CONTINUITY_GAP_TOLERANCE):
+        # Every segment needs a discontinuity marker because FFmpeg records
+        # with -reset_timestamps 1, resetting each .ts file's PTS to 0.
+        # Without this, HLS.js builds a cumulative media timeline that
+        # doesn't match the actual PTS, causing seeks to land wrong.
+        if prev_end is not None:
             lines.append("#EXT-X-DISCONTINUITY")
 
         lines.append(

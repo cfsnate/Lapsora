@@ -54,7 +54,9 @@ def test_generate_playlist_basic(db):
     assert "#EXT-X-ENDLIST" in result
     assert "#EXTINF:300.0," in result
     assert "/api/playback/segment/" in result
-    assert "#EXT-X-DISCONTINUITY" not in result
+    # Every segment gets a discontinuity marker because -reset_timestamps 1
+    # resets PTS in each .ts file
+    assert result.count("#EXT-X-DISCONTINUITY") == 2  # between segments 1-2 and 2-3
 
 
 def test_generate_playlist_with_gap(db):
@@ -195,11 +197,11 @@ def test_availability_does_not_merge_real_gaps(db):
     assert len(ranges) == 2
 
 
-def test_playlist_no_discontinuity_for_near_contiguous(db):
-    """Near-contiguous segments should not produce HLS discontinuity markers."""
+def test_playlist_discontinuity_on_every_segment(db):
+    """Every segment gets a discontinuity marker due to -reset_timestamps 1."""
     profile = _create_profile(db)
     _create_segment(db, profile.id, datetime(2026, 3, 30, 10, 0), duration=299.8)
     _create_segment(db, profile.id, datetime(2026, 3, 30, 10, 5), duration=299.8)
 
     result = generate_playlist(db, profile.id, datetime(2026, 3, 30, 10, 0), datetime(2026, 3, 30, 11, 0))
-    assert "#EXT-X-DISCONTINUITY" not in result
+    assert result.count("#EXT-X-DISCONTINUITY") == 1  # between the two segments
