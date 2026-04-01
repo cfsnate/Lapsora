@@ -662,13 +662,16 @@ def _get_oidc_client(db: Session) -> tuple[OAuth, str]:
     client_secret_row = db.query(Setting).filter(Setting.key == "oidc_client_secret").first()
     provider_name_row = db.query(Setting).filter(Setting.key == "oidc_provider_name").first()
 
-    if not issuer_row or not client_id_row or not client_secret_row:
+    if not issuer_row or not client_id_row:
         raise HTTPException(status_code=400, detail="oidc_not_configured")
 
-    try:
-        client_secret = decrypt(client_secret_row.value)
-    except Exception:
-        raise HTTPException(status_code=500, detail="oidc_config_corrupt")
+    # Client secret is optional — when absent, we use PKCE (public client flow)
+    client_secret = None
+    if client_secret_row and client_secret_row.value:
+        try:
+            client_secret = decrypt(client_secret_row.value)
+        except Exception:
+            raise HTTPException(status_code=500, detail="oidc_config_corrupt")
 
     provider_name = provider_name_row.value if provider_name_row else "oidc"
     issuer_url = issuer_row.value.rstrip("/")
@@ -680,14 +683,20 @@ def _get_oidc_client(db: Session) -> tuple[OAuth, str]:
     if groups_claim:
         scopes += " " + groups_claim
 
+    client_kwargs: dict = {"scope": scopes}
+    if not client_secret:
+        # Public client: use PKCE (Authorization Code + S256 challenge)
+        client_kwargs["code_challenge_method"] = "S256"
+        client_kwargs["token_endpoint_auth_method"] = "none"
+
     try:
         oauth = OAuth()
         oauth.register(
             name="oidc",
             client_id=client_id_row.value,
-            client_secret=client_secret,
+            client_secret=client_secret or "",
             server_metadata_url=f"{issuer_url}/.well-known/openid-configuration",
-            client_kwargs={"scope": scopes},
+            client_kwargs=client_kwargs,
         )
     except Exception as exc:
         logger.warning("OIDC provider discovery failed: %s", exc)
@@ -860,8 +869,6 @@ def put_oidc_config(
 ):
     """Save OIDC provider config (admin-only)."""
 
-    encrypted_secret = encrypt(payload.client_secret)
-
     def _upsert(key: str, value: str) -> None:
         row = db.query(Setting).filter(Setting.key == key).first()
         if row:
@@ -871,7 +878,16 @@ def put_oidc_config(
 
     _upsert("oidc_issuer_url", payload.issuer_url)
     _upsert("oidc_client_id", payload.client_id)
-    _upsert("oidc_client_secret", encrypted_secret)
+
+    # Client secret is optional — encrypt and store when provided, clear when empty
+    if payload.client_secret:
+        encrypted_secret = encrypt(payload.client_secret)
+        _upsert("oidc_client_secret", encrypted_secret)
+    else:
+        # Clear any previously stored secret (switching to public client / PKCE)
+        row = db.query(Setting).filter(Setting.key == "oidc_client_secret").first()
+        if row:
+            row.value = ""
     if payload.provider_name is not None:
         _upsert("oidc_provider_name", payload.provider_name)
     if payload.groups_claim is not None:

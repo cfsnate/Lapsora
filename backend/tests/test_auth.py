@@ -420,6 +420,21 @@ def test_put_oidc_config_saves_and_returns_enabled(client: TestClient):
     assert get_resp.json()["enabled"] is True
 
 
+def test_put_oidc_config_without_secret_succeeds(client: TestClient):
+    """Admin can save OIDC config without client_secret (public client / PKCE)."""
+    _setup_and_login(client)
+    payload = {
+        "issuer_url": "https://okta.example.com",
+        "client_id": "public-client-id",
+        "provider_name": "Okta",
+    }
+    resp = client.put(OIDC_CONFIG_URL, json=payload)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["enabled"] is True
+    assert data["issuer_url"] == "https://okta.example.com"
+
+
 # --- GET /oidc/login ---
 
 

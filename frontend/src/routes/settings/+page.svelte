@@ -671,14 +671,15 @@
 						/>
 					</div>
 					<div>
-						<label for="oidc-client-secret" class="mb-1 block text-sm font-medium text-gray-300">Client Secret</label>
+						<label for="oidc-client-secret" class="mb-1 block text-sm font-medium text-gray-300">Client Secret <span class="text-gray-500">(optional)</span></label>
 						<input
 							id="oidc-client-secret"
 							type="password"
 							bind:value={oidcForm.client_secret}
-							placeholder="Leave blank to keep existing secret"
+							placeholder="Leave blank for public client (PKCE)"
 							class="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
 						/>
+						<p class="mt-1 text-xs text-gray-500">Not required for public clients (e.g. Okta SPA apps). PKCE will be used automatically when no secret is provided.</p>
 					</div>
 					<div>
 						<label for="oidc-provider-name" class="mb-1 block text-sm font-medium text-gray-300">Provider Name <span class="text-gray-500">(optional)</span></label>

@@ -519,7 +519,7 @@ export interface OIDCConfig {
 export interface OIDCConfigUpdate {
 	issuer_url: string;
 	client_id: string;
-	client_secret: string;
+	client_secret?: string;
 	provider_name?: string;
 	groups_claim?: string;
 }

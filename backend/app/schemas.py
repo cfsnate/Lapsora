@@ -603,7 +603,7 @@ class OIDCConfigRead(BaseModel):
 class OIDCConfigUpdate(BaseModel):
     issuer_url: str
     client_id: str
-    client_secret: str
+    client_secret: str | None = None
     provider_name: str | None = None
     groups_claim: str | None = None
 
