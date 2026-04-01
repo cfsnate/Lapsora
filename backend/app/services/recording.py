@@ -193,16 +193,17 @@ class RecordingProcess:
             "-rtsp_transport", "tcp",
             "-rtsp_flags", "prefer_tcp",
             "-use_wallclock_as_timestamps", "1",
-            "-stimeout", "5000000",
+            "-timeout", "30000000",       # 30s network timeout (microseconds)
+            "-reconnect", "1",
+            "-reconnect_streamed", "1",
+            "-reconnect_delay_max", "30",  # max 30s between reconnect attempts
             "-i", self.rtsp_url,
             "-c", "copy",
             "-f", "segment",
             "-segment_time", str(self.segment_duration),
             "-segment_format", "mpegts",
-            "-segment_atclocktime", "1",
             "-reset_timestamps", "1",
             "-strftime", "1",
-            "-break_non_keyframes", "1",
             pattern,
         ]
 
