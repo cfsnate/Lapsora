@@ -110,7 +110,23 @@ from starlette.responses import RedirectResponse  # noqa: E402
 
 class HTTPSRedirectMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: StarletteRequest, call_next):
-        if not app_settings.TLS_ENABLED:
+        # Check TLS_ENABLED from env var OR from the DB settings table.
+        # The DB value is set automatically after cert acquisition.
+        tls_enabled = app_settings.TLS_ENABLED
+        if not tls_enabled:
+            try:
+                from app.database import SessionLocal
+                from app.models import Setting
+                db = SessionLocal()
+                try:
+                    row = db.query(Setting).filter(Setting.key == "tls_enabled").first()
+                    tls_enabled = row is not None and row.value.lower() == "true"
+                finally:
+                    db.close()
+            except Exception:
+                pass
+
+        if not tls_enabled:
             return await call_next(request)
         # Skip ACME challenge paths
         if request.url.path.startswith("/.well-known/acme-challenge/"):

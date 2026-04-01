@@ -128,7 +128,19 @@ async def acquire_cert(body: TLSAcquireRequest, db: Session = Depends(get_db)):
     logger.info("Starting ACME certificate acquisition for domain %s (force=%s)", domain, body.force)
     ok = await asyncio.to_thread(acquire_certificate, domain, db)
     if ok:
-        return {"success": True, "message": f"Certificate successfully acquired for {domain}."}
+        # Auto-enable TLS so the redirect middleware activates
+        update_tls_settings(db, enabled=True)
+
+        # Hot-start HTTPS on port 443 without requiring a container restart
+        from app.services.tls import start_https_listener
+        https_started = start_https_listener()
+
+        if https_started:
+            msg = f"Certificate acquired for {domain}. HTTPS is now active on port 443."
+        else:
+            msg = f"Certificate acquired for {domain}. Restart the container to activate HTTPS on port 443."
+
+        return {"success": True, "message": msg}
     raise HTTPException(status_code=502, detail="Certificate acquisition failed. Check server logs for details.")
 
 

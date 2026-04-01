@@ -306,6 +306,17 @@ def get_certificate_info() -> Optional[TLSCertificateInfo]:
     except Exception:
         domain = ""
 
+    # Many modern CAs (e.g. Smallstep) leave CN empty and put the domain
+    # only in Subject Alternative Names. Fall back to the first SAN DNS entry.
+    if not domain:
+        try:
+            san_ext = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName)
+            dns_names = san_ext.value.get_values_for_type(x509.DNSName)
+            if dns_names:
+                domain = dns_names[0]
+        except (x509.ExtensionNotFound, Exception):
+            pass
+
     try:
         issuer_cn = cert.issuer.get_attributes_for_oid(NameOID.COMMON_NAME)
         issuer = issuer_cn[0].value if issuer_cn else str(cert.issuer)
@@ -385,3 +396,50 @@ def update_tls_settings(db, *, domain: Optional[str] = None, email: Optional[str
         _db_set(db, SETTING_KEY_ACME_CA_BUNDLE, acme_ca_bundle)
     if enabled is not None:
         _db_set(db, SETTING_KEY_TLS_ENABLED, str(enabled).lower())
+
+
+# ---------------------------------------------------------------------------
+# Hot-start HTTPS listener (no container restart required)
+# ---------------------------------------------------------------------------
+
+_https_server = None  # Track the running HTTPS server so we don't start duplicates
+
+
+def start_https_listener() -> bool:
+    """Start a uvicorn HTTPS server on port 443 in a background thread.
+
+    Called after certificate acquisition so TLS activates immediately
+    without a container restart.  Returns True if started, False if
+    certs are missing or a listener is already running.
+    """
+    global _https_server  # noqa: PLW0603
+
+    if _https_server is not None:
+        logger.info("HTTPS listener already running on port 443")
+        return False
+
+    cert_dir = _get_cert_dir()
+    fullchain = cert_dir / "fullchain.pem"
+    privkey = cert_dir / "privkey.pem"
+    if not fullchain.exists() or not privkey.exists():
+        logger.warning("Cannot start HTTPS listener: cert files missing")
+        return False
+
+    import threading
+    import uvicorn
+
+    config = uvicorn.Config(
+        "app.main:app",
+        host="0.0.0.0",
+        port=443,
+        ssl_certfile=str(fullchain),
+        ssl_keyfile=str(privkey),
+        log_level="info",
+    )
+    server = uvicorn.Server(config)
+    _https_server = server
+
+    thread = threading.Thread(target=server.run, name="https-listener", daemon=True)
+    thread.start()
+    logger.info("HTTPS listener started on port 443 (hot-start, no restart needed)")
+    return True

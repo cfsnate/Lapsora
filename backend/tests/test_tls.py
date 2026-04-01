@@ -546,6 +546,49 @@ def test_get_certificate_info_returns_serial_number():
     int(info.serial_number, 16)
 
 
+def _make_san_only_cert(domain: str = "san.example.com", days_valid: int = 90) -> bytes:
+    """Generate a self-signed cert with the domain in SAN only (no CN)."""
+    key = rsa.generate_private_key(
+        public_exponent=65537, key_size=2048, backend=default_backend()
+    )
+    now = datetime.now(UTC)
+    subject = issuer = x509.Name([
+        x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Test Org"),
+    ])
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(issuer)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now)
+        .not_valid_after(now + timedelta(days=days_valid))
+        .add_extension(
+            x509.SubjectAlternativeName([x509.DNSName(domain)]),
+            critical=False,
+        )
+        .sign(key, hashes.SHA256(), default_backend())
+    )
+    return cert.public_bytes(serialization.Encoding.PEM)
+
+
+def test_get_certificate_info_domain_from_san():
+    """When CN is empty, domain is extracted from Subject Alternative Names."""
+    from app.services.tls import get_certificate_info
+
+    cert_pem = _make_san_only_cert(domain="san-only.example.com")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        fullchain = Path(tmpdir) / "fullchain.pem"
+        fullchain.write_bytes(cert_pem)
+
+        with patch("app.services.tls._get_cert_dir", return_value=Path(tmpdir)):
+            info = get_certificate_info()
+
+    assert info is not None
+    assert info.domain == "san-only.example.com"
+
+
 # ---------------------------------------------------------------------------
 # check_renewal_needed — unit tests
 # ---------------------------------------------------------------------------
