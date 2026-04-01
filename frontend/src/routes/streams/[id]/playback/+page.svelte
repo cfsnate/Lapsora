@@ -137,6 +137,14 @@
 	function handleTimeUpdate(time: Date | null) {
 		currentTime = time;
 		if (!time || !selectedProfileId || mode !== 'recording') return;
+
+		// If playback has caught up to near-realtime, switch to live
+		const lagMs = Date.now() - time.getTime();
+		if (lagMs < 10_000) {
+			handleGoLive();
+			return;
+		}
+
 		if (!playbackWindowEnd) return;
 		// Advance the window when within 5 minutes of its end
 		if (time.getTime() > playbackWindowEnd.getTime() - 5 * 60 * 1000) {
