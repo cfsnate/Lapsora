@@ -188,6 +188,19 @@
 						</svg>
 						Groups
 					</a>
+					<a
+						href="/admin/console"
+						class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors {
+							($page.url.pathname as string) === '/admin/console'
+								? 'bg-gray-800 text-white font-medium'
+								: 'text-gray-400 hover:bg-gray-800 hover:text-white'
+						}"
+					>
+						<svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z" />
+						</svg>
+						Console
+					</a>
 				{/if}
 			</nav>
 			<div class="border-t border-gray-800 p-3">
