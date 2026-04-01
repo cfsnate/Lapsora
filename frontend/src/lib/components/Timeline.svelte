@@ -144,20 +144,18 @@
 		});
 	});
 
-	function handleWheel(e: WheelEvent) {
-		e.preventDefault();
-		const rect = containerEl!.getBoundingClientRect();
-		const mouseX = e.clientX - rect.left;
-		const mouseRatio = mouseX / containerWidth;
+	/**
+	 * Core zoom helper: applies a zoom factor anchored at a given ratio (0–1)
+	 * within the current view. factor > 1 zooms out, factor < 1 zooms in.
+	 */
+	function applyZoom(factor: number, anchorRatio: number = 0.5) {
 		const currentRange = viewEnd.getTime() - viewStart.getTime();
-
-		const zoomFactor = e.deltaY > 0 ? 1.3 : 1 / 1.3;
-		let newRange = currentRange * zoomFactor;
+		let newRange = currentRange * factor;
 		newRange = Math.max(MIN_WINDOW_MS, Math.min(MAX_WINDOW_MS, newRange));
 
-		const mouseTime = viewStart.getTime() + mouseRatio * currentRange;
-		let newStart = mouseTime - mouseRatio * newRange;
-		let newEnd = mouseTime + (1 - mouseRatio) * newRange;
+		const anchorTime = viewStart.getTime() + anchorRatio * currentRange;
+		let newStart = anchorTime - anchorRatio * newRange;
+		let newEnd = anchorTime + (1 - anchorRatio) * newRange;
 
 		// Don't let the view extend past now
 		const now = Date.now();
@@ -169,6 +167,24 @@
 		viewStart = new Date(newStart);
 		viewEnd = new Date(newEnd);
 		activeZoom = '';
+	}
+
+	function handleWheel(e: WheelEvent) {
+		e.preventDefault();
+		const rect = containerEl!.getBoundingClientRect();
+		const mouseX = e.clientX - rect.left;
+		const mouseRatio = mouseX / containerWidth;
+		const zoomFactor = e.deltaY > 0 ? 1.3 : 1 / 1.3;
+		applyZoom(zoomFactor, mouseRatio);
+	}
+
+	function handleDblClick(e: MouseEvent) {
+		e.preventDefault();
+		if (!containerEl) return;
+		const rect = containerEl.getBoundingClientRect();
+		const clickRatio = (e.clientX - rect.left) / containerWidth;
+		// Zoom in 2× centered on the double-clicked point
+		applyZoom(0.5, clickRatio);
 	}
 
 	function handlePointerDown(e: PointerEvent) {
@@ -252,6 +268,7 @@
 		bind:this={containerEl}
 		class="relative h-12 w-full rounded bg-gray-800 touch-none {clipMode ? 'cursor-crosshair' : 'cursor-pointer'}"
 		onwheel={handleWheel}
+		ondblclick={handleDblClick}
 		onpointerdown={handlePointerDown}
 		onpointermove={handlePointerMove}
 		onpointerup={handlePointerUp}
@@ -327,6 +344,27 @@
 			class="rounded-lg border border-gray-700 bg-gray-800 px-4 py-2 text-sm text-gray-100 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
 		/>
 		<div class="flex items-center gap-1">
+			<button
+				onclick={() => applyZoom(1 / 1.3)}
+				class="rounded-md px-2 py-1 text-xs bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700"
+				aria-label="Zoom in"
+				title="Zoom in"
+			>
+				<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+					<circle cx="11" cy="11" r="7" /><path stroke-linecap="round" d="M21 21l-4.35-4.35M8 11h6M11 8v6" />
+				</svg>
+			</button>
+			<button
+				onclick={() => applyZoom(1.3)}
+				class="rounded-md px-2 py-1 text-xs bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700"
+				aria-label="Zoom out"
+				title="Zoom out"
+			>
+				<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+					<circle cx="11" cy="11" r="7" /><path stroke-linecap="round" d="M21 21l-4.35-4.35M8 11h6" />
+				</svg>
+			</button>
+			<div class="w-px h-4 bg-gray-700 mx-1"></div>
 			{#each zoomPresets as preset}
 				<button
 					onclick={() => handleZoomPreset(preset)}
