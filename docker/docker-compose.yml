@@ -4,7 +4,7 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
     ports:
-      - "8000:8000"
+      - "8000:80"
       - "443:443"
       - "80:80"
     volumes:
@@ -16,7 +16,7 @@ services:
     env_file:
       - ../.env
     healthcheck:
-      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/api/system/info').raise_for_status()"]
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:80/api/system/info').raise_for_status()"]
       interval: 30s
       timeout: 10s
       retries: 3
