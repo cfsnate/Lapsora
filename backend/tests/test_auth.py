@@ -718,6 +718,33 @@ def test_admin_sees_all_profiles(client: TestClient, db):
         assert p.id in returned_ids
 
 
+def test_admin_user_read_has_all_permissions(client: TestClient, db):
+    """Admin user in GET /users list shows all profiles with full permissions."""
+    _admin_setup_and_login(client)
+    stream, profiles = _make_stream_and_profiles(db, count=2)
+    db.commit()
+
+    resp = client.get(USERS_URL)
+    assert resp.status_code == 200
+    admin_user = resp.json()[0]  # First user is the admin from setup
+    assert admin_user["role"] == "admin"
+
+    # Admin should have all profile IDs
+    profile_ids_set = set(admin_user["accessible_profile_ids"])
+    for p in profiles:
+        assert p.id in profile_ids_set
+
+    # Admin should have all permissions on each profile
+    perms_by_id = {pp["profile_id"]: pp for pp in admin_user["profile_permissions"]}
+    for p in profiles:
+        assert p.id in perms_by_id
+        pp = perms_by_id[p.id]
+        assert pp["can_view"] is True
+        assert pp["can_export"] is True
+        assert pp["can_timelapse"] is True
+        assert pp["can_manage"] is True
+
+
 def test_set_profile_access_invalid_profile(client: TestClient):
     """PUT /users/{id}/profiles with non-existent profile_id -> 400."""
     _admin_setup_and_login(client)

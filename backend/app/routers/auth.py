@@ -169,19 +169,37 @@ def update_me(
 
 
 def _build_admin_read(user: User, db: Session) -> UserAdminRead:
-    """Build a UserAdminRead by querying the junction table for profile IDs and permissions."""
-    rows = db.query(UserProfileAccess).filter(UserProfileAccess.user_id == user.id).all()
-    profile_ids = [row.profile_id for row in rows]
-    profile_permissions = [
-        ProfilePermission(
-            profile_id=row.profile_id,
-            can_view=row.can_view,
-            can_export=row.can_export,
-            can_timelapse=row.can_timelapse,
-            can_manage=row.can_manage,
-        )
-        for row in rows
-    ]
+    """Build a UserAdminRead by querying the junction table for profile IDs and permissions.
+
+    Admin users implicitly have all permissions on all profiles, so we return
+    every profile with full flags rather than only explicitly-granted rows.
+    """
+    if user.role == "admin":
+        all_profiles = db.query(Profile).all()
+        profile_ids = [p.id for p in all_profiles]
+        profile_permissions = [
+            ProfilePermission(
+                profile_id=p.id,
+                can_view=True,
+                can_export=True,
+                can_timelapse=True,
+                can_manage=True,
+            )
+            for p in all_profiles
+        ]
+    else:
+        rows = db.query(UserProfileAccess).filter(UserProfileAccess.user_id == user.id).all()
+        profile_ids = [row.profile_id for row in rows]
+        profile_permissions = [
+            ProfilePermission(
+                profile_id=row.profile_id,
+                can_view=row.can_view,
+                can_export=row.can_export,
+                can_timelapse=row.can_timelapse,
+                can_manage=row.can_manage,
+            )
+            for row in rows
+        ]
     group_rows = db.query(UserGroupMembership).filter(UserGroupMembership.user_id == user.id).all()
     return UserAdminRead(
         id=user.id,
