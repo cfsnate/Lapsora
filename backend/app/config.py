@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     TLS_CERT_DIR: str = ""  # defaults to DATA_DIR/certs at runtime
     ACME_DIRECTORY_URL: str = "https://acme-v02.api.letsencrypt.org/directory"
     ACME_EMAIL: str = ""
+    ACME_CA_BUNDLE: str = ""  # Path to CA bundle PEM for internal ACME servers
     TLS_DOMAIN: str = ""
 
     def model_post_init(self, __context: object) -> None:

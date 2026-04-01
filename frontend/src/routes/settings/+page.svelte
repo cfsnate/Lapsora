@@ -55,7 +55,7 @@
 
 	// TLS config state
 	let tlsConfig = $state<TLSConfig | null>(null);
-	let tlsForm = $state({ domain: '', email: '', acme_directory_url: 'https://acme-v02.api.letsencrypt.org/directory', enabled: false });
+	let tlsForm = $state({ domain: '', email: '', acme_directory_url: 'https://acme-v02.api.letsencrypt.org/directory', acme_ca_bundle: '', enabled: false });
 	let savingTLS = $state(false);
 	let tlsSaveResult = $state<{ ok: boolean; message: string } | null>(null);
 	let certInfo = $state<TLSCertificateInfo | null>(null);
@@ -103,6 +103,7 @@
 				domain: cfg.domain,
 				email: cfg.email,
 				acme_directory_url: cfg.acme_directory_url || 'https://acme-v02.api.letsencrypt.org/directory',
+				acme_ca_bundle: cfg.acme_ca_bundle || '',
 				enabled: cfg.enabled,
 			};
 			if (cfg.has_certificate) {
@@ -794,6 +795,17 @@
 							class="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
 						/>
 						<p class="mt-1 text-xs text-gray-500">Default is Let's Encrypt production. Use a custom ACME CA if needed.</p>
+					</div>
+					<div>
+						<label for="tls-ca-bundle" class="mb-1 block text-sm font-medium text-gray-300">CA Bundle Path <span class="text-gray-500">(optional)</span></label>
+						<input
+							id="tls-ca-bundle"
+							type="text"
+							bind:value={tlsForm.acme_ca_bundle}
+							placeholder="/etc/ssl/certs/internal-ca.pem"
+							class="w-full rounded-md border border-gray-600 bg-gray-800 px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+						/>
+						<p class="mt-1 text-xs text-gray-500">Path to a CA bundle PEM file on the server. Required for internal ACME servers with self-signed or private CA certificates.</p>
 					</div>
 					{#if tlsSaveResult}
 						<p class="text-sm {tlsSaveResult.ok ? 'text-green-400' : 'text-red-400'}">{tlsSaveResult.message}</p>

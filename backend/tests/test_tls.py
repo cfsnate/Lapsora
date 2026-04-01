@@ -197,6 +197,22 @@ def test_tls_config_put_enabled_flag(client: TestClient):
     assert resp2.json()["enabled"] is False
 
 
+def test_tls_config_ca_bundle_round_trip(client: TestClient):
+    """PUT acme_ca_bundle persists and GET returns it."""
+    _admin_login(client)
+    resp = client.put(CONFIG_URL, json={"acme_ca_bundle": "/etc/ssl/certs/internal-ca.pem"})
+    assert resp.status_code == 200
+    assert resp.json()["acme_ca_bundle"] == "/etc/ssl/certs/internal-ca.pem"
+
+    # GET should also return it
+    resp2 = client.get(CONFIG_URL)
+    assert resp2.json()["acme_ca_bundle"] == "/etc/ssl/certs/internal-ca.pem"
+
+    # Clear it
+    resp3 = client.put(CONFIG_URL, json={"acme_ca_bundle": ""})
+    assert resp3.json()["acme_ca_bundle"] == ""
+
+
 # ---------------------------------------------------------------------------
 # Acquire endpoint
 # ---------------------------------------------------------------------------
@@ -615,3 +631,59 @@ def test_remove_challenge_token():
     _store_challenge(token, f"{token}.auth")
     _remove_challenge(token)
     assert get_challenge_response(token) is None
+
+
+# ---------------------------------------------------------------------------
+# ACME CA bundle — verify_ssl passthrough
+# ---------------------------------------------------------------------------
+
+def test_acme_client_passes_ca_bundle_as_verify_ssl(db):
+    """When acme_ca_bundle is configured, _get_acme_client passes it as verify_ssl."""
+    from app.services.tls import SETTING_KEY_ACME_CA_BUNDLE, _db_set
+
+    _db_set(db, SETTING_KEY_ACME_CA_BUNDLE, "/etc/ssl/certs/internal-ca.pem")
+    _db_set(db, "tls_acme_directory_url", "https://internal.acme.example/directory")
+
+    with patch("app.services.tls.client.ClientNetwork") as MockNetwork:
+        mock_net = MagicMock()
+        MockNetwork.return_value = mock_net
+        # Also mock the directory fetch so it doesn't make real HTTP calls
+        with patch("app.services.tls.client.ClientV2.get_directory"):
+            with patch("app.services.tls.client.ClientV2") as MockClientV2:
+                mock_client = MagicMock()
+                MockClientV2.return_value = mock_client
+                try:
+                    from app.services.tls import _get_acme_client
+                    _get_acme_client(db)
+                except Exception:
+                    pass  # We only care about the ClientNetwork call
+
+        # Verify verify_ssl was passed as the CA bundle path
+        MockNetwork.assert_called_once()
+        call_kwargs = MockNetwork.call_args
+        assert call_kwargs.kwargs.get("verify_ssl") == "/etc/ssl/certs/internal-ca.pem" or \
+               (len(call_kwargs.args) > 2 and call_kwargs.args[2] == "/etc/ssl/certs/internal-ca.pem")
+
+
+def test_acme_client_defaults_verify_ssl_to_true(db):
+    """When no acme_ca_bundle is set, verify_ssl defaults to True."""
+    from app.services.tls import _db_set
+
+    _db_set(db, "tls_acme_directory_url", "https://acme-v02.api.letsencrypt.org/directory")
+
+    with patch("app.services.tls.client.ClientNetwork") as MockNetwork:
+        mock_net = MagicMock()
+        MockNetwork.return_value = mock_net
+        with patch("app.services.tls.client.ClientV2.get_directory"):
+            with patch("app.services.tls.client.ClientV2") as MockClientV2:
+                mock_client = MagicMock()
+                MockClientV2.return_value = mock_client
+                try:
+                    from app.services.tls import _get_acme_client
+                    _get_acme_client(db)
+                except Exception:
+                    pass
+
+        MockNetwork.assert_called_once()
+        call_kwargs = MockNetwork.call_args
+        assert call_kwargs.kwargs.get("verify_ssl") is True

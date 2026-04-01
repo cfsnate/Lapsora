@@ -613,6 +613,7 @@ export interface TLSConfig {
 	domain: string;
 	email: string;
 	acme_directory_url: string;
+	acme_ca_bundle: string;
 	enabled: boolean;
 	has_certificate: boolean;
 }
@@ -621,6 +622,7 @@ export interface TLSConfigUpdate {
 	domain?: string;
 	email?: string;
 	acme_directory_url?: string;
+	acme_ca_bundle?: string;
 	enabled?: boolean;
 }
 

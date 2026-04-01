@@ -33,6 +33,7 @@ def get_tls_config(db: Session = Depends(get_db)):
         domain=cfg.get("domain") or "",
         email=cfg.get("email") or "",
         acme_directory_url=cfg.get("acme_directory_url") or "",
+        acme_ca_bundle=cfg.get("acme_ca_bundle") or "",
         enabled=bool(cfg.get("enabled")),
         has_certificate=cert_info is not None,
     )
@@ -46,6 +47,7 @@ def put_tls_config(body: TLSConfigUpdate, db: Session = Depends(get_db)):
         domain=body.domain,
         email=body.email,
         acme_directory_url=body.acme_directory_url,
+        acme_ca_bundle=body.acme_ca_bundle,
         enabled=body.enabled,
     )
     cfg = get_tls_settings(db)
@@ -54,6 +56,7 @@ def put_tls_config(body: TLSConfigUpdate, db: Session = Depends(get_db)):
         domain=cfg.get("domain") or "",
         email=cfg.get("email") or "",
         acme_directory_url=cfg.get("acme_directory_url") or "",
+        acme_ca_bundle=cfg.get("acme_ca_bundle") or "",
         enabled=bool(cfg.get("enabled")),
         has_certificate=cert_info is not None,
     )

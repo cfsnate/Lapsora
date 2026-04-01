@@ -701,6 +701,7 @@ class TLSConfigRead(BaseModel):
     domain: str
     email: str
     acme_directory_url: str
+    acme_ca_bundle: str = ""
     enabled: bool
     has_certificate: bool
 
@@ -709,6 +710,7 @@ class TLSConfigUpdate(BaseModel):
     domain: str | None = None
     email: str | None = None
     acme_directory_url: str | None = None
+    acme_ca_bundle: str | None = None
     enabled: bool | None = None
 
 

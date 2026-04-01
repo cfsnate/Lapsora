@@ -47,6 +47,7 @@ SETTING_KEY_ACCOUNT_URI = "tls_acme_account_uri"
 SETTING_KEY_TLS_DOMAIN = "tls_domain"
 SETTING_KEY_TLS_EMAIL = "tls_acme_email"
 SETTING_KEY_ACME_DIRECTORY = "tls_acme_directory_url"
+SETTING_KEY_ACME_CA_BUNDLE = "tls_acme_ca_bundle"
 SETTING_KEY_TLS_ENABLED = "tls_enabled"
 
 
@@ -121,8 +122,13 @@ def _get_acme_client(db) -> client.ClientV2:
 
     directory_url = _db_get(db, SETTING_KEY_ACME_DIRECTORY) or app_settings.ACME_DIRECTORY_URL
     email = _db_get(db, SETTING_KEY_TLS_EMAIL) or app_settings.ACME_EMAIL
+    ca_bundle = _db_get(db, SETTING_KEY_ACME_CA_BUNDLE) or app_settings.ACME_CA_BUNDLE
 
-    net = client.ClientNetwork(key=jose_key, user_agent="lapsora-acme/1.0")
+    # verify_ssl accepts True (system trust store) or a path to a CA bundle PEM.
+    # This allows connecting to internal ACME servers with private/self-signed CAs.
+    verify_ssl: bool | str = ca_bundle if ca_bundle else True
+
+    net = client.ClientNetwork(key=jose_key, user_agent="lapsora-acme/1.0", verify_ssl=verify_ssl)
     directory = client.ClientV2.get_directory(directory_url, net)
     acme_client = client.ClientV2(directory, net)
 
@@ -343,12 +349,14 @@ def get_tls_settings(db) -> dict:
         "domain": _db_get(db, SETTING_KEY_TLS_DOMAIN) or app_settings.TLS_DOMAIN,
         "email": _db_get(db, SETTING_KEY_TLS_EMAIL) or app_settings.ACME_EMAIL,
         "acme_directory_url": _db_get(db, SETTING_KEY_ACME_DIRECTORY) or app_settings.ACME_DIRECTORY_URL,
+        "acme_ca_bundle": _db_get(db, SETTING_KEY_ACME_CA_BUNDLE) or app_settings.ACME_CA_BUNDLE,
         "enabled": (_db_get(db, SETTING_KEY_TLS_ENABLED) or str(app_settings.TLS_ENABLED)).lower() == "true",
     }
 
 
 def update_tls_settings(db, *, domain: Optional[str] = None, email: Optional[str] = None,
-                         acme_directory_url: Optional[str] = None, enabled: Optional[bool] = None) -> None:
+                         acme_directory_url: Optional[str] = None, acme_ca_bundle: Optional[str] = None,
+                         enabled: Optional[bool] = None) -> None:
     """Persist TLS settings to the settings table."""
     if domain is not None:
         _db_set(db, SETTING_KEY_TLS_DOMAIN, domain)
@@ -356,5 +364,7 @@ def update_tls_settings(db, *, domain: Optional[str] = None, email: Optional[str
         _db_set(db, SETTING_KEY_TLS_EMAIL, email)
     if acme_directory_url is not None:
         _db_set(db, SETTING_KEY_ACME_DIRECTORY, acme_directory_url)
+    if acme_ca_bundle is not None:
+        _db_set(db, SETTING_KEY_ACME_CA_BUNDLE, acme_ca_bundle)
     if enabled is not None:
         _db_set(db, SETTING_KEY_TLS_ENABLED, str(enabled).lower())
