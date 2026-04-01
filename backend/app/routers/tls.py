@@ -1,5 +1,6 @@
 """Admin-only TLS / ACME certificate management endpoints."""
 
+import asyncio
 import logging
 from pathlib import Path
 
@@ -104,11 +105,14 @@ def delete_ca_bundle(db: Session = Depends(get_db)):
 
 
 @router.post("/acquire")
-def acquire_cert(body: TLSAcquireRequest, db: Session = Depends(get_db)):
+async def acquire_cert(body: TLSAcquireRequest, db: Session = Depends(get_db)):
     """Trigger ACME certificate acquisition.
 
     If *force* is False (default) and a certificate is already present and not
     expiring within 30 days, the call is a no-op and returns a message saying so.
+
+    The actual ACME flow runs in a thread pool so the event loop stays free to
+    serve HTTP-01 challenge callbacks from the ACME server.
     """
     from app.services.tls import check_renewal_needed
 
@@ -122,7 +126,7 @@ def acquire_cert(body: TLSAcquireRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="No domain configured. Set a domain via PUT /api/tls/config first.")
 
     logger.info("Starting ACME certificate acquisition for domain %s (force=%s)", domain, body.force)
-    ok = acquire_certificate(domain, db)
+    ok = await asyncio.to_thread(acquire_certificate, domain, db)
     if ok:
         return {"success": True, "message": f"Certificate successfully acquired for {domain}."}
     raise HTTPException(status_code=502, detail="Certificate acquisition failed. Check server logs for details.")
