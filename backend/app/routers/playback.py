@@ -91,7 +91,7 @@ def get_segment(segment_id: int, request: Request, current_user: User = Depends(
                 "Content-Range": f"bytes {start}-{end}/{file_size}",
                 "Content-Length": str(length),
                 "Accept-Ranges": "bytes",
-                "Cache-Control": "public, max-age=3600",
+                "Cache-Control": "no-store",
             },
         )
 
@@ -99,7 +99,7 @@ def get_segment(segment_id: int, request: Request, current_user: User = Depends(
     return FileResponse(
         abs_path,
         media_type="video/mp2t",
-        headers={"Accept-Ranges": "bytes", "Cache-Control": "public, max-age=3600"},
+        headers={"Accept-Ranges": "bytes", "Cache-Control": "no-store"},
     )
 
 

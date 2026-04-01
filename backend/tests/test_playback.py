@@ -127,6 +127,24 @@ def test_segment_endpoint_file_exists(authed_client, db, tmp_path):
 
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "video/mp2t"
+    assert resp.headers["cache-control"] == "no-store"
+
+
+def test_segment_range_request_no_cache(authed_client, db, tmp_path):
+    """Byte-range segment responses must not be cached."""
+    profile = _create_profile(db)
+    seg = _create_segment(db, profile.id, datetime(2026, 3, 30, 10, 0), file_path="recordings/test.ts")
+
+    fake_file = tmp_path / "recordings" / "test.ts"
+    fake_file.parent.mkdir(parents=True, exist_ok=True)
+    fake_file.write_bytes(b"\x00" * 1024)
+
+    with patch("app.routers.playback.settings") as mock_settings:
+        mock_settings.DATA_DIR = str(tmp_path)
+        resp = authed_client.get(f"/api/playback/segment/{seg.id}", headers={"Range": "bytes=0-187"})
+
+    assert resp.status_code == 206
+    assert resp.headers["cache-control"] == "no-store"
 
 
 def test_segment_not_found(authed_client, db):
